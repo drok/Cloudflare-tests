@@ -45,75 +45,116 @@
     var dateFormat = d3.time.format("%Y-%m-%d");
 
     d3.selectAll("div.roadmap").each(function() {
-      var currentInstance = {
-        tasks: [],
-        people: [],
-        node: this
-      };
-      var currentTask = {};
+      try {
+        _parseFromJsonFormat(this, JSON.parse(this.textContent || this.innerHTML), colors, dateFormat);
+      } catch (error) {
+        _parseFromOriginalFormat(this, colors, dateFormat);
+      }
+    });
+  };
 
-      var lines = (currentInstance.node.textContent || currentInstance.node.innerHTML || "").split("\n");
-      for (var j = 0, line; line = lines[j], j < lines.length; j++) {
-        var texts;
-        line = line.replace(/^\s+|\s+$/g, "");
+  var _parseFromJsonFormat = function (node, tasks, colors, dateFormat) {
+    var currentInstance = {
+      tasks: [],
+      people: [],
+      node: node
+    };
+    var currentTask = {};
 
-        // 1st line, project name followed by task name
-        if (!currentTask.name && !currentTask.group) {
-          texts = line.split(",");
-          currentTask.type = "task";
-          currentTask.group = texts.slice(0, -1).join(",").trim();
-          currentTask.name = texts.slice(-1).join(",").trim();
-          currentTask.style = currentTask.group.match(/^\*/) ? "bold" : "normal";
-          currentTask.group = currentTask.group.replace(/^\*\s+/, "");
-          currentTask.color = colors(currentTask.group);
-          continue;
-        }
+    for (var i = 0; i < tasks.length; i++) {
+      currentTask.type = "task";
+      currentTask.group = tasks[i].taskName;
+      currentTask.name = tasks[i].subTaskName ? tasks[i].subTaskName : '';
+      currentTask.style = tasks[i].style ? tasks[i].style : "normal";
+      currentTask.color = tasks[i].color ? tasks[i].color : colors(currentTask.group);
+      currentTask.from = dateFormat.parse(tasks[i].from);
+      currentTask.to = dateFormat.parse(tasks[i].to);
+      currentTask.to.setHours(currentTask.to.getHours() + 24); // Set the end of the day
+      if (tasks[i].people) {
+        currentInstance.people.push({
+          type: "people",
+          group: tasks[i].people,
+          from: currentTask.from,
+          to: currentTask.to,
+          name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
+          taskGroup: currentTask.group,
+          color: tasks[i].color ? tasks[i].color : colors(currentTask.group),
+          involvement: tasks[i].involvement ? parseInt(tasks[i].involvement, 10) : 100
+        });
+      }
+      currentInstance.tasks.push(currentTask);
+      currentTask = {};
+    }
+    refresh.apply(currentInstance);
+  };
 
-        // 2nd line, dates from and to
-        if (!currentTask.from && !currentTask.to) {
-          texts = line.replace(/[^0-9\-\/]+/, " ").split(" ");
-          currentTask.from = dateFormat.parse(texts[0]);
-          currentTask.to = dateFormat.parse(texts[1]);
-          currentTask.to.setHours(currentTask.to.getHours() + 24); // Set the end of the day
-          continue;
-        }
+  var _parseFromOriginalFormat = function (node, colors, dateFormat) {
+    var currentInstance = {
+      tasks: [],
+      people: [],
+      node: node
+    };
+    var currentTask = {};
 
-        // next lines, people
-        if (line !== "") {
-          var matches, involvement;
-          matches = line.match(/\s+(\d+)%\s*$/);
+    var lines = (currentInstance.node.textContent || currentInstance.node.innerHTML || "").split("\n");
+    for (var j = 0, line; line = lines[j], j < lines.length; j++) {
+      var texts;
+      line = line.replace(/^\s+|\s+$/g, "");
 
-          if (matches) {
-            involvement = parseInt(matches[1], 10);
-            line = line.substring(0, line.length - matches[0].length).trim();
-          } else {
-            involvement = 100;
-          }
-
-          currentInstance.people.push({
-            type: "people",
-            group: line,
-            from: currentTask.from,
-            to: currentTask.to,
-            name: currentTask.group + " — " + currentTask.name,
-            taskGroup: currentTask.group,
-            color: colors(currentTask.group),
-            involvement: involvement
-          });
-          continue;
-        }
-
-        // last line, empty
-        if (line === "" && currentTask.name) {
-          currentInstance.tasks.push(currentTask);
-          currentTask = {};
-          continue;
-        }
+      // 1st line, project name followed by task name
+      if (!currentTask.name && !currentTask.group) {
+        texts = line.split(",");
+        currentTask.type = "task";
+        currentTask.group = texts.slice(0, -1).join(",").trim();
+        currentTask.name = texts.slice(-1).join(",").trim();
+        currentTask.style = currentTask.group.match(/^\*/) ? "bold" : "normal";
+        currentTask.group = currentTask.group.replace(/^\*\s+/, "");
+        currentTask.color = colors(currentTask.group);
+        continue;
       }
 
-      refresh.apply(currentInstance);
-    });
+      // 2nd line, dates from and to
+      if (!currentTask.from && !currentTask.to) {
+        texts = line.replace(/[^0-9\-\/]+/, " ").split(" ");
+        currentTask.from = dateFormat.parse(texts[0]);
+        currentTask.to = dateFormat.parse(texts[1]);
+        currentTask.to.setHours(currentTask.to.getHours() + 24); // Set the end of the day
+        continue;
+      }
 
+      // next lines, people
+      if (line !== "") {
+        var matches, involvement;
+        matches = line.match(/\s+(\d+)%\s*$/);
+
+        if (matches) {
+          involvement = parseInt(matches[1], 10);
+          line = line.substring(0, line.length - matches[0].length).trim();
+        } else {
+          involvement = 100;
+        }
+
+        currentInstance.people.push({
+          type: "people",
+          group: line,
+          from: currentTask.from,
+          to: currentTask.to,
+          name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
+          taskGroup: currentTask.group,
+          color: colors(currentTask.group),
+          involvement: involvement
+        });
+        continue;
+      }
+
+      // last line, empty
+      if (line === "" && currentTask.name) {
+        currentInstance.tasks.push(currentTask);
+        currentTask = {};
+        continue;
+      }
+    }
+    refresh.apply(currentInstance);
   };
 
   var draw = function(items, options) {
@@ -382,21 +423,21 @@
 
         if (xCoord > sidePadding) {
           verticalMouse
-              .attr("x1", xCoord)
-              .attr("y1", 10)
-              .attr("x2", xCoord)
-              .attr("y2", svg.attr("height") - 20)
-              .style("display", "block");
+            .attr("x1", xCoord)
+            .attr("y1", 10)
+            .attr("x2", xCoord)
+            .attr("y2", svg.attr("height") - 20)
+            .style("display", "block");
 
           verticalMouseBox
-              .attr("x", xCoord - 25)
-              .attr("y", yCoord - (barHeight + 8) / 2 + verticalMouseTopPadding)
-              .style("display", "block");
+            .attr("x", xCoord - 25)
+            .attr("y", yCoord - (barHeight + 8) / 2 + verticalMouseTopPadding)
+            .style("display", "block");
 
           verticalMouseText
-              .attr("transform", "translate(" + xCoord + "," + (yCoord + verticalMouseTopPadding) + ")")
-              .text(d3.time.format("%b %d")(timeScale.invert(xCoord - sidePadding)))
-              .style("display", "block");
+            .attr("transform", "translate(" + xCoord + "," + (yCoord + verticalMouseTopPadding) + ")")
+            .text(d3.time.format("%b %d")(timeScale.invert(xCoord - sidePadding)))
+            .style("display", "block");
         } else {
           verticalMouse.style("display", "none");
           verticalMouseBox.style("display", "none");
@@ -421,12 +462,12 @@
 
   function getGroupName(d) {
     switch (d.type) {
-    case "people":
-      return d.taskGroup;
-    case "task":
-      return d.group;
-    case "group":
-      return d.name;
+      case "people":
+        return d.taskGroup;
+      case "task":
+        return d.group;
+      case "group":
+        return d.name;
     }
   }
 
