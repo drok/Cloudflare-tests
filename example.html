@@ -27,7 +27,7 @@
 <body>
 
 <h3>Project A Roadmap</h3>
-<div class="roadmap">
+<div class="roadmap" data-graph-option-ticks="month">
   Master Plan, Step 1
   2014-12-1 > 2014-12-28
 
@@ -42,7 +42,7 @@
 <div class="roadmap">
   Project A, Dev
   2014-12-1 > 2014-12-9
-  John
+  John 50%
 
   Project A, QA
   2014-12-10 > 2014-12-31
@@ -71,13 +71,20 @@
 </div>
 
 <h3>Project C Roadmap</h3>
-<div class="roadmap">
-[
-  {"taskName":"Project A","subTaskName":"Dev","from":"2014-12-1","to":"2014-12-9","color":"#F81D1D","people":"John"},
-  {"taskName":"Project A","subTaskName":"QA","from":"2014-12-10","to":"2014-12-31","color":"#bdb76b","people":"Paul"},
-  {"taskName":"Project B","subTaskName":"Dev","from":"2014-12-1","to":"2014-12-9","color":"#7fff00","people":"John"},
-  {"taskName":"Project B","subTaskName":"QA","from":"2015-1-1","to":"2015-2-15","color":"#8b008b","people":"John"}
-]
+<div class="roadmap" data-graph-option-type="people" data-graph-option-date-format="%-m月%-d日" data-graph-option-ticks="month" data-graph-additional-xaxis="true">
+{
+  "tasks":[
+    {"taskName":"Project A","subTaskName":"Dev","from":"2014-12-1","to":"2014-12-9","color":"#F81D1D","people":"John","involvement":30},
+    {"taskName":"Project A","subTaskName":"QA","from":"2014-12-10","to":"2014-12-31","color":"#bdb76b","people":"Paul"},
+    {"taskName":"Project B","subTaskName":"Dev","from":"2014-12-1","to":"2014-12-9","color":"#7fff00","people":"Joe"},
+    {"taskName":"Project B","subTaskName":"QA","from":"2015-1-1","to":"2015-2-15","color":"#8b008b","people":"John"}
+  ],
+  "peopleOrder":{
+    "Paul":10,
+    "John": 5,
+    "Joe": 7
+  }
+}
 </div>
 
 </body>

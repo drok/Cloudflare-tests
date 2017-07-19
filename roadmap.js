@@ -13,26 +13,33 @@
         };
       }
 
-      var options = draw.apply(this, [this.tasks.filter(function(task) {
-        if (filter && task.group !== filter) {
-          return false;
-        } else {
-          return true;
-        }
-      }), {}]);
-
-      this.people.sort(function(a, b) {
-        return a.group > b.group ? 1 : -1;
-      });
-
-      if (this.people.length > 0) {
-        draw.apply(this, [this.people.filter(function(person) {
-          if (filter && person.taskGroup !== filter) {
+      var options = {};
+      if (this.graphOption.type !== "people") {
+        options = draw.apply(this, [this.tasks.filter(function (task) {
+          if (filter && task.group !== filter) {
             return false;
           } else {
             return true;
           }
-        }), options]);
+        }), {}]);
+      }
+
+      if (this.graphOption.type !== "tasks") {
+        if (this.people.length > 0) {
+          this.people.sort(function (a, b) {
+            if (a.order && b.order && a.order !== b.order) {
+              return a.order < b.order ? 1 : -1;
+            }
+            return a.group > b.group ? 1 : -1;
+          });
+          draw.apply(this, [this.people.filter(function (person) {
+            if (filter && person.taskGroup !== filter) {
+              return false;
+            } else {
+              return true;
+            }
+          }), options]);
+        }
       }
     }
   };
@@ -45,21 +52,29 @@
     var dateFormat = d3.time.format("%Y-%m-%d");
 
     d3.selectAll("div.roadmap").each(function() {
+      var currentInstance = {
+        tasks: [],
+        people: [],
+        graphOption: {
+          type: this.getAttribute("data-graph-option-type"),
+          dateFormat:this.getAttribute("data-graph-option-date-format"),
+          ticksType: this.getAttribute('data-graph-option-ticks'),
+          additionalXAxis: this.getAttribute('data-graph-additional-xaxis') === "true"
+        },
+        node: this
+      };
       try {
-        _parseFromJsonFormat(this, JSON.parse(this.textContent || this.innerHTML), colors, dateFormat);
+        _parseFromJsonFormat(currentInstance, JSON.parse(this.textContent || this.innerHTML), colors, dateFormat);
       } catch (error) {
-        _parseFromOriginalFormat(this, colors, dateFormat);
+        _parseFromOriginalFormat(currentInstance, colors, dateFormat);
       }
     });
   };
 
-  var _parseFromJsonFormat = function (node, tasks, colors, dateFormat) {
-    var currentInstance = {
-      tasks: [],
-      people: [],
-      node: node
-    };
+  var _parseFromJsonFormat = function (currentInstance, data, colors, dateFormat) {
     var currentTask = {};
+    var tasks = data.tasks;
+    var peopleOrder = data.peopleOrder;
 
     for (var i = 0; i < tasks.length; i++) {
       currentTask.type = "task";
@@ -71,16 +86,33 @@
       currentTask.to = dateFormat.parse(tasks[i].to);
       currentTask.to.setHours(currentTask.to.getHours() + 24); // Set the end of the day
       if (tasks[i].people) {
-        currentInstance.people.push({
-          type: "people",
-          group: tasks[i].people,
-          from: currentTask.from,
-          to: currentTask.to,
-          name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
-          taskGroup: currentTask.group,
-          color: tasks[i].color ? tasks[i].color : colors(currentTask.group),
-          involvement: tasks[i].involvement ? parseInt(tasks[i].involvement, 10) : 100
-        });
+        if (Array.isArray(tasks[i].people)) {
+          for (var j = 0; j < tasks[i].people.length; j++) {
+            currentInstance.people.push({
+              type: "people",
+              order: peopleOrder[tasks[i].people[j]] ? parseInt(peopleOrder[tasks[i].people[j]]) : 0,
+              group: tasks[i].people[j],
+              from: currentTask.from,
+              to: currentTask.to,
+              name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
+              taskGroup: currentTask.group,
+              color: tasks[i].color ? tasks[i].color : colors(currentTask.group),
+              involvement: tasks[i].involvement ? parseInt(tasks[i].involvement, 10) : 100
+            });
+          }
+        } else {
+          currentInstance.people.push({
+            type: "people",
+            order: peopleOrder[tasks[i].people] ? parseInt(peopleOrder[tasks[i].people]) : 0,
+            group: tasks[i].people,
+            from: currentTask.from,
+            to: currentTask.to,
+            name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
+            taskGroup: currentTask.group,
+            color: tasks[i].color ? tasks[i].color : colors(currentTask.group),
+            involvement: tasks[i].involvement ? parseInt(tasks[i].involvement, 10) : 100
+          });
+        }
       }
       currentInstance.tasks.push(currentTask);
       currentTask = {};
@@ -88,12 +120,7 @@
     refresh.apply(currentInstance);
   };
 
-  var _parseFromOriginalFormat = function (node, colors, dateFormat) {
-    var currentInstance = {
-      tasks: [],
-      people: [],
-      node: node
-    };
+  var _parseFromOriginalFormat = function (currentInstance, colors, dateFormat) {
     var currentTask = {};
 
     var lines = (currentInstance.node.textContent || currentInstance.node.innerHTML || "").split("\n");
@@ -181,6 +208,9 @@
       if (a.group === b.group) {
         return a.from > b.from ? 1 : -1;
       } else {
+        if (a.order && b.order && a.order !== b.order) {
+          return a.order < b.order ? 1 : -1;
+        }
         return a.group > b.group ? 1 : -1;
       }
     });
@@ -294,12 +324,51 @@
       .orient("bottom")
       .ticks(d3.time.monday)
       .tickSize(- svg.attr("height") + topPadding + 20, 0, 0)
-      .tickFormat(d3.time.format("%b %d"));
+      .tickFormat(d3.time.format(currentInstance.graphOption.dateFormat ? currentInstance.graphOption.dateFormat : "%b %d"));
+    if (currentInstance.graphOption.ticksType === "month") {
+      xAxis.ticks(d3.time.month);
+    }
 
     // Draw vertical grid
     var xAxisGroup = svg.append("g")
       .attr("transform", "translate(" + sidePadding + ", " + (svg.attr("height") - 20) + ")")
       .call(xAxis);
+
+    xAxisGroup.selectAll("text")
+      .style("text-anchor", "middle")
+      .attr("fill", "#000")
+      .attr("stroke", "none")
+      .attr("font-size", 10)
+      .attr("dy", "1em");
+
+    xAxisGroup.selectAll(".tick line")
+      .attr("stroke", "#dddddd")
+      .attr("shape-rendering", "crispEdges");
+
+    // add "top" X Axis
+    if (currentInstance.graphOption.additionalXAxis) {
+      var additionalXAxis = d3.svg.axis()
+        .scale(timeScale)
+        .orient("top")
+        .ticks(d3.time.monday)
+        .tickSize(- svg.attr("height") + topPadding + 20, 0, 0)
+        .tickFormat(d3.time.format(currentInstance.graphOption.dateFormat ? currentInstance.graphOption.dateFormat : "%b %d"));
+      if (currentInstance.graphOption.ticksType === "month") {
+        additionalXAxis.ticks(d3.time.month);
+      }
+      var additionalXAxisGroup =  svg.append("g")
+        .attr("transform", "translate(" + sidePadding + ", " + (svg.attr("height") - h) + ")")
+        .call(additionalXAxis);
+      additionalXAxisGroup.selectAll("text")
+        .style("text-anchor", "middle")
+        .attr("fill", "#000")
+        .attr("stroke", "none")
+        .attr("font-size", 10)
+        .attr("dy", "1em");
+      additionalXAxisGroup.selectAll(".tick line")
+        .attr("stroke", "#dddddd")
+        .attr("shape-rendering", "crispEdges");
+    }
 
     // Now
     var now = new Date();
@@ -318,17 +387,6 @@
         .attr("stroke-dasharray", "2,2")
         .attr("shape-rendering", "crispEdges");
     }
-
-    xAxisGroup.selectAll("text")
-      .style("text-anchor", "middle")
-      .attr("fill", "#000")
-      .attr("stroke", "none")
-      .attr("font-size", 10)
-      .attr("dy", "1em");
-
-    xAxisGroup.selectAll(".tick line")
-      .attr("stroke", "#dddddd")
-      .attr("shape-rendering", "crispEdges");
 
     // Items group
     var rectangles = svg.append("g")
@@ -384,73 +442,71 @@
       .style("pointer-events", "none");
 
     // Draw vertical mouse helper
-    if (options.svg) {
-      var verticalMouse = svg.append("line")
-        .attr("x1", 0)
-        .attr("y1", 0)
-        .attr("x2", 0)
-        .attr("y2", 0)
-        .style("stroke", "black")
-        .style("stroke-width", "1px")
-        .style("stroke-dasharray", "2,2")
-        .style("shape-rendering", "crispEdges")
-        .style("pointer-events", "none")
-        .style("display", "none");
+    var verticalMouse = svg.append("line")
+      .attr("x1", 0)
+      .attr("y1", 0)
+      .attr("x2", 0)
+      .attr("y2", 0)
+      .style("stroke", "black")
+      .style("stroke-width", "1px")
+      .style("stroke-dasharray", "2,2")
+      .style("shape-rendering", "crispEdges")
+      .style("pointer-events", "none")
+      .style("display", "none");
 
-      var verticalMouseBox = svg.append("rect")
-        .attr("rx", 3)
-        .attr("ry", 3)
-        .attr("width", 50)
-        .attr("height", barHeight)
-        .attr("stroke", "none")
-        .attr("fill", "black")
-        .attr("fill-opacity", 0.8)
-        .style("display", "none");
+    var verticalMouseBox = svg.append("rect")
+      .attr("rx", 3)
+      .attr("ry", 3)
+      .attr("width", 50)
+      .attr("height", barHeight)
+      .attr("stroke", "none")
+      .attr("fill", "black")
+      .attr("fill-opacity", 0.8)
+      .style("display", "none");
 
-      var verticalMouseText = svg.append("text")
-        .attr("font-size", 11)
-        .attr("font-weight", "bold")
-        .attr("text-anchor", "middle")
-        .attr("text-height", barHeight)
-        .attr("fill", "white")
-        .style("display", "none");
+    var verticalMouseText = svg.append("text")
+      .attr("font-size", 11)
+      .attr("font-weight", "bold")
+      .attr("text-anchor", "middle")
+      .attr("text-height", barHeight)
+      .attr("fill", "white")
+      .style("display", "none");
 
-      var verticalMouseTopPadding = 40;
+    var verticalMouseTopPadding = 40;
 
-      svg.on("mousemove", function () {
-        var xCoord = d3.mouse(this)[0],
-          yCoord = d3.mouse(this)[1];
+    svg.on("mousemove", function () {
+      var xCoord = d3.mouse(this)[0],
+        yCoord = d3.mouse(this)[1];
 
-        if (xCoord > sidePadding) {
-          verticalMouse
-            .attr("x1", xCoord)
-            .attr("y1", 10)
-            .attr("x2", xCoord)
-            .attr("y2", svg.attr("height") - 20)
-            .style("display", "block");
+      if (xCoord > sidePadding) {
+        verticalMouse
+          .attr("x1", xCoord)
+          .attr("y1", 10)
+          .attr("x2", xCoord)
+          .attr("y2", svg.attr("height") - 20)
+          .style("display", "block");
 
-          verticalMouseBox
-            .attr("x", xCoord - 25)
-            .attr("y", yCoord - (barHeight + 8) / 2 + verticalMouseTopPadding)
-            .style("display", "block");
+        verticalMouseBox
+          .attr("x", xCoord - 25)
+          .attr("y", yCoord - (barHeight + 8) / 2 + verticalMouseTopPadding)
+          .style("display", "block");
 
-          verticalMouseText
-            .attr("transform", "translate(" + xCoord + "," + (yCoord + verticalMouseTopPadding) + ")")
-            .text(d3.time.format("%b %d")(timeScale.invert(xCoord - sidePadding)))
-            .style("display", "block");
-        } else {
-          verticalMouse.style("display", "none");
-          verticalMouseBox.style("display", "none");
-          verticalMouseText.style("display", "none");
-        }
-      });
-
-      svg.on("mouseleave", function() {
+        verticalMouseText
+          .attr("transform", "translate(" + xCoord + "," + (yCoord + verticalMouseTopPadding) + ")")
+          .text(d3.time.format(currentInstance.graphOption.dateFormat ? currentInstance.graphOption.dateFormat : "%b %d")(timeScale.invert(xCoord - sidePadding)))
+          .style("display", "block");
+      } else {
         verticalMouse.style("display", "none");
         verticalMouseBox.style("display", "none");
         verticalMouseText.style("display", "none");
-      });
-    }
+      }
+    });
+
+    svg.on("mouseleave", function() {
+      verticalMouse.style("display", "none");
+      verticalMouseBox.style("display", "none");
+      verticalMouseText.style("display", "none");
+    });
 
     // options for the 2nd drawing
     return {
