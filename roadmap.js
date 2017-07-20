@@ -71,11 +71,20 @@
     });
   };
 
+  var getPersonById = function (id, people) {
+    for (var i = 0; i < people.length; i++) {
+      if (people[i].id === id) {
+        return people[i];
+      }
+    }
+  };
+
   var _parseFromJsonFormat = function (currentInstance, data, colors, dateFormat) {
     var currentTask = {};
     var tasks = data.tasks;
-    var peopleOrder = data.peopleOrder;
+    var people = data.people;
 
+    var person;
     for (var i = 0; i < tasks.length; i++) {
       currentTask.type = "task";
       currentTask.group = tasks[i].taskName;
@@ -89,10 +98,11 @@
       if (tasks[i].people) {
         if (Array.isArray(tasks[i].people)) {
           for (var j = 0; j < tasks[i].people.length; j++) {
+            person = getPersonById(tasks[i].people[j], people);
             currentInstance.people.push({
               type: "people",
-              order: peopleOrder[tasks[i].people[j]] ? parseInt(peopleOrder[tasks[i].people[j]]) : 0,
-              group: tasks[i].people[j],
+              order: person.order ? parseInt(person.order) : 0,
+              group: person.name,
               from: currentTask.from,
               to: currentTask.to,
               name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
@@ -103,10 +113,11 @@
             });
           }
         } else {
+          person = getPersonById(tasks[i].people, people);
           currentInstance.people.push({
             type: "people",
-            order: peopleOrder[tasks[i].people] ? parseInt(peopleOrder[tasks[i].people]) : 0,
-            group: tasks[i].people,
+            order: person.order ? parseInt(person.order) : 0,
+            group: person.name,
             from: currentTask.from,
             to: currentTask.to,
             name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
