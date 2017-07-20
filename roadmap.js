@@ -27,8 +27,8 @@
       if (this.graphOption.type !== "tasks") {
         if (this.people.length > 0) {
           this.people.sort(function (a, b) {
-            if (a.order && b.order && a.order !== b.order) {
-              return a.order < b.order ? 1 : -1;
+            if (a.order !== b.order) {
+              return a.order > b.order ? 1 : -1;
             }
             return a.group > b.group ? 1 : -1;
           });
@@ -82,6 +82,7 @@
       currentTask.name = tasks[i].subTaskName ? tasks[i].subTaskName : '';
       currentTask.style = tasks[i].style ? tasks[i].style : "normal";
       currentTask.color = tasks[i].color ? tasks[i].color : colors(currentTask.group);
+      currentTask.order = tasks[i].order ? parseInt(tasks[i].order, 10) : 0;
       currentTask.from = dateFormat.parse(tasks[i].from);
       currentTask.to = dateFormat.parse(tasks[i].to);
       currentTask.to.setHours(currentTask.to.getHours() + 24); // Set the end of the day
@@ -96,6 +97,7 @@
               to: currentTask.to,
               name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
               taskGroup: currentTask.group,
+              taskOrder: currentTask.order,
               color: tasks[i].color ? tasks[i].color : colors(currentTask.group),
               involvement: tasks[i].involvement ? parseInt(tasks[i].involvement, 10) : 100
             });
@@ -109,6 +111,7 @@
             to: currentTask.to,
             name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
             taskGroup: currentTask.group,
+            taskOrder: currentTask.order,
             color: tasks[i].color ? tasks[i].color : colors(currentTask.group),
             involvement: tasks[i].involvement ? parseInt(tasks[i].involvement, 10) : 100
           });
@@ -206,10 +209,13 @@
     // Sort items
     items.sort(function(a, b) {
       if (a.group === b.group) {
+        if (a.taskOrder !== b.taskOrder) {
+          return a.taskOrder > b.taskOrder ? 1 : -1;
+        }
         return a.from > b.from ? 1 : -1;
       } else {
-        if (a.order && b.order && a.order !== b.order) {
-          return a.order < b.order ? 1 : -1;
+        if (a.order !== b.order) {
+          return a.order > b.order ? 1 : -1;
         }
         return a.group > b.group ? 1 : -1;
       }
