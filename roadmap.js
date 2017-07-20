@@ -56,9 +56,9 @@
         tasks: [],
         people: [],
         graphOption: {
-          type: this.getAttribute("data-graph-option-type"),
-          dateFormat:this.getAttribute("data-graph-option-date-format"),
-          ticksType: this.getAttribute('data-graph-option-ticks'),
+          type: this.getAttribute("data-graph-type"),
+          dateFormat:this.getAttribute("data-graph-date-format"),
+          ticksType: this.getAttribute('data-graph-ticks'),
           additionalXAxis: this.getAttribute('data-graph-additional-xaxis') === "true"
         },
         node: this
