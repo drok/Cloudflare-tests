@@ -43,6 +43,7 @@ deprecation_setup() {
     if [ ${CF_PAGES:+isset} ] ; then
         export GIT_ALTERNATE_OBJECT_DIRECTORIES=$REPO_DIR/.git/objects
         SOURCE_COMMIT_SHA="$CF_PAGES_COMMIT_SHA"
+        SOURCE_BRANCH=$CF_PAGES_BRANCH
     else
         # Local testing
         if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
@@ -50,6 +51,7 @@ deprecation_setup() {
             if [ ${TEST_SHA:+isset} ] ; then
                 SOURCE_COMMIT_SHA="$TEST_SHA"
             fi
+            SOURCE_BRANCH=unknown-local/source-branch
         fi
     fi
 
@@ -205,6 +207,7 @@ set -x
 
         local commit=$(git commit-tree -p $parent -p $SOURCE_COMMIT_SHA -m "$msg" ${tree})
         git update-ref -m "$msg" refs/heads/$branchname $commit
+        git replace --graft $SOURCE_COMMIT_SHA
     else
         git commit -m "$msg" || :
     fi
