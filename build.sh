@@ -18,5 +18,9 @@ pstree -apl
 
 ps axuww
 
+echo /opt/pages/build_tool/run_build.sh ::::::::::::::::::::
+cat /opt/pages/build_tool/run_build.sh
+
+
 echo EXITING WITH ERROR
 exit 2
