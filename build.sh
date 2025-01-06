@@ -68,7 +68,7 @@ set -x
         git config gc.pruneExpire now
         git config user.name "Archivium Cache Bot"
         git config user.email "unbust-cache-script@archivium.org"
-        git remote add "$remotename" "${dburl}/${CACHE_UNBUST_KEY}/$GIT_DIR"
+        git remote add "$remotename" "${dburl}/${CACHE_UNBUST_KEY}/$dbdir"
 
         # Local testing
         if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
@@ -188,6 +188,7 @@ deprecation_track() {
     # Implentation choices
     local branchname=published
     local remotename=public
+    local dbdir=db
 
     # Ensure we know where the persistent DB is kept
     [[ ${dburl:+isset} ]] 
@@ -226,6 +227,8 @@ set -x
     fi
 
     deprecation_refill "${dburl}"
+
+    mv "${CACHE_UNBUST_KEY}/$GIT_DIR" "${CACHE_UNBUST_KEY}/$dbdir"
 }
 
 FN=$(command date "+%F %H%M%S")
