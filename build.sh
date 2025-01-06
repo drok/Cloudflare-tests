@@ -21,7 +21,7 @@ else
 fi
 
 PUBLIC_URL="https://cloudflare-tests.pages.dev"
-DEFAULT_CACHE_UNBUST_TIME="3 minutes ago"
+DEFAULT_CACHE_UNBUST_TIME="3 months ago"
 
 NOW=$(date +%s)
 # NOW=$(command date --date="2020-06-01" "+%s")
