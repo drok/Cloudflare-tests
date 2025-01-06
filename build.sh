@@ -207,8 +207,9 @@ set -x
 
         local commit=$(git commit-tree -p $parent -p $SOURCE_COMMIT_SHA -m "$msg" ${tree})
         git update-ref -m "$msg" refs/heads/$branchname $commit
-        git replace --graft $SOURCE_COMMIT_SHA
-        git log --graph --all
+        # git replace --graft $SOURCE_COMMIT_SHA
+        echo $SOURCE_COMMIT_SHA >>$GIT_DIR/shallow
+        git log --oneline --graph --all
     else
         git commit -m "$msg" || :
     fi
