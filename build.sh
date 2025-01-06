@@ -245,6 +245,8 @@ echo hello >"$FN"
 mkdir subdir
 echo hello >"subdir/$FN"
 
+find
+
 deprecation_track "$PUBLIC_URL" "$DEPRECATION_MESSAGE"
 
 # Local testing
