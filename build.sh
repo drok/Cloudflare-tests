@@ -209,7 +209,7 @@ set -x
         git commit -m "$msg" || :
     fi
 
-set +x
+# set +x
     git gc --quiet
     git pack-refs --all --prune
     git update-server-info
