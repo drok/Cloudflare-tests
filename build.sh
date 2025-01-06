@@ -1,6 +1,5 @@
 #!/bin/bash
 
-output_dir="/tmp/out"
 # Local testing
 if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
     TEST_SHA="377adeb59f3f3256d7ddee3e2e9ca09361507bd4"
@@ -12,11 +11,13 @@ unset SOURCE_COMMIT_SHA
 
 set -o errexit
 
-[[ ${output_dir:+isset} ]]
-
 # Local testing
 if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
+    output_dir="/tmp/out"
+    [[ ${output_dir:+isset} ]]
     rm -rf "${output_dir}"
+else
+    output_dir=out
 fi
 
 PUBLIC_URL="https://cloudflare-tests.pages.dev"
@@ -209,7 +210,7 @@ set -x
         git update-ref -m "$msg" refs/heads/$branchname $commit
         # git replace --graft $SOURCE_COMMIT_SHA
         echo $SOURCE_COMMIT_SHA >> "${CACHE_UNBUST_KEY}/$GIT_DIR/shallow"
-        git log --oneline --graph --all
+        git log --oneline --graph --decorate --all
     else
         git commit -m "$msg" || :
     fi
