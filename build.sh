@@ -245,9 +245,10 @@ echo hello >"$FN"
 mkdir subdir
 echo hello >"subdir/$FN"
 
+deprecation_track "$PUBLIC_URL" "$DEPRECATION_MESSAGE"
+
 find
 
-deprecation_track "$PUBLIC_URL" "$DEPRECATION_MESSAGE"
 
 # Local testing
 if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
