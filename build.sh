@@ -236,14 +236,14 @@ else
     DEPRECATION_MESSAGE=""
 fi
 
-
-mkdir -p $output_dir
+set -x
+mkdir -p "$output_dir"
 WORKDIR=$PWD
 cd $output_dir
 
-echo hello >"$output_dir/$FN"
-mkdir $output_dir/subdir
-echo hello >"$output_dir/subdir/$FN"
+echo hello >"$FN"
+mkdir subdir
+echo hello >"subdir/$FN"
 
 deprecation_track "$PUBLIC_URL" "$DEPRECATION_MESSAGE"
 
