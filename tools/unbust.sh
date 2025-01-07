@@ -121,9 +121,6 @@ deprecation_setup() {
 
     export GIT_COMMITTER_DATE=$NOW GIT_AUTHOR_DATE=$NOW GIT_DIR=.git
 
-    # Ensure UNBUST_CACHE_DBNAME is set. There is no default, because it should be
-    # secret
-
 	if [ -f "${UNBUST_CACHE_DBNAME}" ] ; then
 		>&2 echo "ERROR: A file named '${UNBUST_CACHE_DBNAME}' (UNBUST_CACHE_DBNAME) already exists in the output directory."
 		>&2 echo "       Set UNBUST_CACHE_DBNAME to another filename or remove the offending file from the output"
@@ -134,11 +131,11 @@ deprecation_setup() {
 	local tmp=$(mktemp)
 	if ! fetch_status=$(curl -L --fail -H "Cache-control: no-cache, private" --write-out "%{http_code}" -o $tmp "${dburl}/${UNBUST_CACHE_DBNAME}") ; then
 	
-	    if [[ $fetch_status == "000" ]] ; then
-		>&2 echo "ERROR: The persistence database could not be fetched from '${dburl}/${UNBUST_CACHE_DBNAME}'."
-		>&2 echo "       If it's a network error, try again later. Is the hostname correct?"
-		exit 1
-	    fi
+        if [[ $fetch_status == "000" ]] ; then
+            >&2 echo "ERROR: The persistence database could not be fetched from '${dburl}/${UNBUST_CACHE_DBNAME}'."
+            >&2 echo "       If it's a network error, try again later. Is the hostname correct?"
+            exit 1
+        fi
 
 	    # If the db is empty, create a new one
 	    # But prevent inadventently resetting persistence state due to
@@ -147,15 +144,15 @@ deprecation_setup() {
 	    local HEAD initial_sha
 	    if ! HEAD=$(command git rev-parse HEAD) || ! initial_sha=$(command git rev-parse $INITIAL_COMMIT_SHA) || [ "$HEAD" != "$initial_sha" ]; then
 
-		>&2 echo "ERROR: The persistence database could not be fetched."
-		>&2 echo "       Refusing to create a new one because the initial commit hash is not the same as the current commit."
-		if [[ $fetch_status == 404 ]] ; then
-		    >&2 echo "       No persistence DB exists at ${dburl}/${UNBUST_CACHE_DBNAME} (404)."
-		    >&2 echo "       This is a configuration error (PUBLIC_URL mismatch?)"
-		else
-		    >&2 echo "       If it's a network error, try again later. Curl said ($fetch_status)."
-		fi
-		exit 1
+            >&2 echo "ERROR: The persistence database could not be fetched."
+            >&2 echo "       Refusing to create a new one because the initial commit hash is not the same as the current commit."
+            if [[ $fetch_status == 404 ]] ; then
+                >&2 echo "       No persistence DB exists at ${dburl}/${UNBUST_CACHE_DBNAME} (404)."
+                >&2 echo "       This is a configuration error (PUBLIC_URL mismatch?)"
+            else
+                >&2 echo "       If it's a network error, try again later. Curl said ($fetch_status)."
+            fi
+            exit 1
 	    fi
 	    pushd
 	    command git -c init.defaultBranch=published init --quiet --template=/dev/null "${dbdir}"
@@ -178,7 +175,7 @@ deprecation_setup() {
 	    git checkout -q "$branchname"
 	fi
 	rm -f $tmp
-	}
+}
 
 # Fetch from the currently published version of the site the files which are
 # deprecated
@@ -307,12 +304,39 @@ deprecation_track() {
 }
 
 fetch_repo() {
-    :
+    local dburl="$1"
+
+	local fetch_status
+	local tmp=$(mktemp)
+	if ! fetch_status=$(curl -L --fail -H "Cache-control: no-cache, private" --write-out "%{http_code}" -o $tmp "${dburl}/${UNBUST_CACHE_DBNAME}") ; then
+	
+        if [[ $fetch_status == "000" ]] ; then
+            >&2 echo "ERROR: The persistence database could not be fetched from '${dburl}/${UNBUST_CACHE_DBNAME}'."
+            >&2 echo "       If it's a network error, try again later. Is the hostname correct?"
+            exit 1
+        fi
+
+        >&2 echo "       No persistence DB exists at ${dburl}/${UNBUST_CACHE_DBNAME} (404)."
+        exit 1
+	elif [ -d  .git ] then
+	    if ! openssl enc "${ENCRYPTION_CIPHER[@]}" -d -in $tmp |
+		    tar xj -C "${dbdir}" .git/; then
+        git remote add cdn "${dburl}"
+	    git checkout -q "$branchname"
+    else
+	    if ! openssl enc "${ENCRYPTION_CIPHER[@]}" -d -in $tmp |
+		    tar xj -C "${dbdir}" --transform "s@\.git/refs/heads/$branchame@.git/refs/remotes/cdn/$branchname" .git/objects/pack .git/refs/heads/$branchname ; then
+            >&2 echo "ERROR: The persistence database could not be decrypted."
+            >&2 echo "       This is a configuration error (UNBUST_CACHE_KEY mismatch?)"
+            exit 1
+	    fi
+	fi
+	rm -f $tmp
 }
 
 usage() {
     echo "Usage: $0 [-f] <output directory> <initial commit hash>"
-    echo "  -f  Fetch the repo (eg, for record keeping)"
+    echo "  -f  Fetch the repo into the current dir (eg, for record keeping)"
     echo "  -h  Show this help"
 }
 
