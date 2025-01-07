@@ -33,12 +33,11 @@ date() {
 }
 
 git() {
-    command git -C "${CACHE_UNBUST_KEY}" "$@"
+    command git -C "${dbdir}" "$@"
 }
 
 deprecation_setup() {
     local dburl="$1"
-
     # GIT_DIR=${CACHE_UNBUST_KEY:-}
 
     export GIT_COMMITTER_DATE=$NOW GIT_AUTHOR_DATE=$NOW GIT_DIR=.git
@@ -64,7 +63,7 @@ deprecation_setup() {
 set -x
     if [ ! -d "${CACHE_UNBUST_KEY}" ] ; then
         # mkdir -p "${CACHE_UNBUST_KEY}"
-        command git -c init.defaultBranch=published init --template=/dev/null "${CACHE_UNBUST_KEY}"
+        command git -c init.defaultBranch=published init --template=/dev/null "${dbdir}"
         git config pack.packSizeLimit 20m
         git config commit.gpgSign false
         git config gc.pruneExpire now
@@ -84,7 +83,7 @@ set -x
             :
         else
             set -o pipefail
-            if ! curl -s --fail "${dburl}/${CACHE_UNBUST_KEY}/$dbdir" | tar xjv -C "${CACHE_UNBUST_KEY}" ; then
+            if ! curl -s --fail "${dburl}/${CACHE_UNBUST_KEY}" | tar xjv -C "${dbdir}" ; then
             # if true ; then
                 git commit --allow-empty -m "Initial commit"
                 git branch empty
@@ -196,14 +195,17 @@ deprecation_track() {
     # Implentation choices
     local branchname=published
     local remotename=public
-    local dbdir=db
+
+    local dbdir=$(mktemp -d)
+
+    # local dbdir=db
 
     # Ensure we know where the persistent DB is kept
     [[ ${dburl:+isset} ]] 
 
     deprecation_setup "${dburl}"
 
-    find -type f \! -path "./${CACHE_UNBUST_KEY}/*" -printf '%P\n' >"${CACHE_UNBUST_KEY}"/files
+    find -type f -printf '%P\n' >"${dbdir}"/files
 
     git add -A files
 set -x
@@ -220,13 +222,13 @@ set -x
         # git replace --graft $SOURCE_COMMIT_SHA
 
         # Copy the commit object from the source repo so rev-parse doesn't fail
-        echo $SOURCE_COMMIT_SHA >> "${CACHE_UNBUST_KEY}/$GIT_DIR/shallow"
+        echo $SOURCE_COMMIT_SHA >> "${dbdir}/$GIT_DIR/shallow"
         # FIXME: WORKDIR should not be here
         echo $SOURCE_COMMIT_SHA | command git -C $WORKDIR pack-objects --stdout | GIT_ALTERNATE_OBJECT_DIRECTORIES= git unpack-objects
         # git log --oneline --graph --decorate --all
         GIT_ALTERNATE_OBJECT_DIRECTORIES= git cat-file -p $SOURCE_COMMIT_SHA
         GIT_ALTERNATE_OBJECT_DIRECTORIES= git cat-file -p $branchname
-        cat $CACHE_UNBUST_KEY/$GIT_DIR/shallow
+        cat $dbdir/$GIT_DIR/shallow
     else
         git commit -m "$msg" || :
     fi
@@ -254,10 +256,11 @@ set -x
 
     git checkout empty
     # FIXME: Max size 25M, then we have to split
-    tar cjf "${CACHE_UNBUST_KEY}"/$dbdir --remove-files -C "${CACHE_UNBUST_KEY}" "$GIT_DIR"
+    tar cjf "${CACHE_UNBUST_KEY}" --remove-files -C "${dbdir}" "$GIT_DIR"
     # mv "${CACHE_UNBUST_KEY}/$GIT_DIR" "${CACHE_UNBUST_KEY}/$dbdir"
 
     find
+    rm -rf $dbdir
 }
 
 FN=$(command date "+%F %H%M%S")
