@@ -68,7 +68,7 @@ set -x
         git config gc.pruneExpire now
         git config user.name "Archivium Cache Bot"
         git config user.email "unbust-cache-script@archivium.org"
-        curl -s --fail "${dburl}/${CACHE_UNBUST_KEY}/$dbdir" | tar xj -C "${CACHE_UNBUST_KEY}"
+        
         # git remote add "$remotename" "${dburl}/${CACHE_UNBUST_KEY}/$dbdir"
 
         # Local testing
@@ -81,12 +81,13 @@ set -x
         if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
             :
         else
-            # if ! git fetch "$remotename" ; then
-            #     git commit --allow-empty -m "Initial commit"
-            # else
+            set -o pipefail
+            if ! curl -s --fail "${dburl}/${CACHE_UNBUST_KEY}/$dbdir" | tar xjv -C "${CACHE_UNBUST_KEY}" ; then
+                git commit --allow-empty -m "Initial commit"
+            else
                 git checkout "$branchname"
                 git remote remove "$remotename"
-            # fi
+            fi
         fi
     fi
 }
@@ -229,6 +230,7 @@ set -x
 
     deprecation_refill "${dburl}"
 
+    # FIXME: Max size 25M, then we have to split
     tar cjvf $dbdir "${CACHE_UNBUST_KEY}/$GIT_DIR"
     # mv "${CACHE_UNBUST_KEY}/$GIT_DIR" "${CACHE_UNBUST_KEY}/$dbdir"
 }
