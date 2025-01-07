@@ -262,6 +262,7 @@ sitestats() {
     echo "${num_files} files, ${size[0]}"
 }
 
+branchname=published
 deprecation_track() {
     # public location where the website is published. The deprecation DB will
     # be stored in the $UNBUST_CACHE_DBNAME directory at that location
@@ -269,7 +270,6 @@ deprecation_track() {
     local msg="${2:-Published $(sitestats)}"
 
     # Implentation choices
-    local branchname=published
     local remotename=public
 
     local dbdir=$(mktemp -td unbust-db.XXXXXX)
@@ -308,7 +308,7 @@ fetch_repo() {
 
 	local fetch_status
 	local tmp=$(mktemp)
-	if ! fetch_status=$(curl -L --fail -H "Cache-control: no-cache, private" --write-out "%{http_code}" -o $tmp "${dburl}/${UNBUST_CACHE_DBNAME}") ; then
+	if ! fetch_status=$(curl -s -L --fail -H "Cache-control: no-cache, private" --write-out "%{http_code}" -o $tmp "${dburl}/${UNBUST_CACHE_DBNAME}") ; then
 	
         if [[ $fetch_status == "000" ]] ; then
             >&2 echo "ERROR: The persistence database could not be fetched from '${dburl}/${UNBUST_CACHE_DBNAME}'."
@@ -318,17 +318,27 @@ fetch_repo() {
 
         >&2 echo "       No persistence DB exists at ${dburl}/${UNBUST_CACHE_DBNAME} (404)."
         exit 1
-	elif [ -d  .git ] then
+	elif [ ! -d  .git ] ; then
 	    if ! openssl enc "${ENCRYPTION_CIPHER[@]}" -d -in $tmp |
-		    tar xj -C "${dbdir}" .git/; then
-        git remote add cdn "${dburl}"
-	    git checkout -q "$branchname"
-    else
+		    tar xj .git/; then
+                >&2 echo "ERROR: The persistence database could not be decrypted."
+                >&2 echo "ERROR: The persistence database could not be decrypted."
+                exit 1
+	    fi
+	    command git remote add cdn "${dburl}"
+	    command git checkout -q "$branchname"
+    	else
 	    if ! openssl enc "${ENCRYPTION_CIPHER[@]}" -d -in $tmp |
-		    tar xj -C "${dbdir}" --transform "s@\.git/refs/heads/$branchame@.git/refs/remotes/cdn/$branchname" .git/objects/pack .git/refs/heads/$branchname ; then
-            >&2 echo "ERROR: The persistence database could not be decrypted."
-            >&2 echo "       This is a configuration error (UNBUST_CACHE_KEY mismatch?)"
-            exit 1
+		    tar xj --transform "s@\.git/packed-refs@.git/packed-refs.cdn@" .git/objects/pack .git/packed-refs ; then
+                >&2 echo "ERROR: The persistence database could not be decrypted."
+                >&2 echo "       This is a configuration error (UNBUST_CACHE_KEY mismatch?)"
+                exit 1
+	    fi
+	    local remote_branch=($(grep "refs/heads/$branchname" .git/packed-refs.cdn))
+	    if [[ "${#remote_branch[@]}" == 2 ]] ; then
+		    mkdir -p .git/refs/remotes/cdn
+		    echo ${remote_branch[0]} > .git/refs/remotes/cdn/$branchname
+		    command git merge --ff-only cdn/$branchname
 	    fi
 	fi
 	rm -f $tmp
@@ -344,7 +354,8 @@ unset opt OPTARG
 OPTIND=1
 while getopts ":fh" opt ; do
     case $opt in
-        f) fetch_repo
+        f) fetch_repo "$PUBLIC_URL"
+		exit 0
                 ;;
         h) usage
                 exit 0
