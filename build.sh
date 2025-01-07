@@ -1,5 +1,69 @@
 #!/bin/bash
 
+ENCRYPTION_CIPHER=aes-128-gcm
+
+set
+error=0
+
+# Required control variables:
+[[ ${UNBUST_CACHE_KEY:+isset} ]] || {
+    >&2 echo "ERROR: UNBUST_CACHE_KEY is not set."
+    error=1
+}
+
+[[ ${PUBLIC_URL:+isset} ]] || {
+    >&2 echo "ERROR: PUBLIC_URL is not set."
+    error=1
+}
+
+# Optional control variables:
+[[ ${UNBUST_CACHE_DBNAME:+isset} ]] || {
+    UNBUST_CACHE_DBNAME=unbust-cache-db
+}
+
+[[ ${UNBUST_CACHE_TIME:+isset} ]] || {
+    UNBUST_CACHE_TIME="3 months ago"
+}
+# ############# End of configuration #########################
+
+# ############# CDN support hooks ############################
+#
+# CND_set_vars() must set the following variables:
+# - SOURCE_COMMIT_SHA   - The commit SHA being deployed
+# - SOURCE_BRANCH       - The branch being deployed
+# - DEPRECATION_MESSAGE - The msg to as commit message when storing state in
+#                         the db. In case you ever look at the db (which is
+#                         a simple git repo tar.bz2 and encrypted), this can
+#                         help with debugging.
+CDN_set_vars()  {
+    if [ ${CF_PAGES:+isset} ] ; then
+        export GIT_ALTERNATE_OBJECT_DIRECTORIES=$REPO_DIR/.git/objects
+        SOURCE_COMMIT_SHA="$CF_PAGES_COMMIT_SHA"
+        SOURCE_BRANCH=$CF_PAGES_BRANCH
+        DEPRECATION_MESSAGE="Published $(sitestats) from ${CF_PAGES_BRANCH} (${CF_PAGES_COMMIT_SHA::8}), at ${CF_PAGES_URL}"
+    else
+        # Local testing
+        if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
+            export GIT_ALTERNATE_OBJECT_DIRECTORIES=$WORKDIR/.git/objects
+            if [ ${TEST_SHA:+isset} ] ; then
+                SOURCE_COMMIT_SHA="$TEST_SHA"
+            fi
+            SOURCE_BRANCH=unknown-local/source-branch
+            DEPRECATION_MESSAGE="Published $(sitestats)"
+        fi
+    fi
+}
+
+# ################ End of CDN support hooks #####################
+
+set -o errexit
+set -o pipefail
+
+[[ $error == 0 ]] || {
+    >&2 echo "See https://github.com/archivium/unbust"
+    exit 1
+}
+
 # Local testing
 if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
     TEST_SHA="377adeb59f3f3256d7ddee3e2e9ca09361507bd4"
@@ -10,7 +74,6 @@ LINK_PUBLISHED_HISTORY_TO_SOURCE_HISTORY=""
 
 unset SOURCE_COMMIT_SHA
 
-set -o errexit
 
 # Local testing
 if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
@@ -22,8 +85,7 @@ else
 fi
 
 # FIXME: Implement deployment to subdir of host (ie, wget needs to --cut-dirs)
-PUBLIC_URL="https://cloudflare-tests.pages.dev"
-DEFAULT_CACHE_UNBUST_TIME="3 months ago"
+DEFAULT_UNBUST_CACHE_TIME="3 months ago"
 
 NOW=$(date +%s)
 # NOW=$(command date --date="2020-06-01" "+%s")
@@ -38,31 +100,15 @@ git() {
 
 deprecation_setup() {
     local dburl="$1"
-    # GIT_DIR=${CACHE_UNBUST_KEY:-}
+    # GIT_DIR=${UNBUST_CACHE_DBNAME:-}
 
     export GIT_COMMITTER_DATE=$NOW GIT_AUTHOR_DATE=$NOW GIT_DIR=.git
 
-    if [ ${CF_PAGES:+isset} ] ; then
-        export GIT_ALTERNATE_OBJECT_DIRECTORIES=$REPO_DIR/.git/objects
-        SOURCE_COMMIT_SHA="$CF_PAGES_COMMIT_SHA"
-        SOURCE_BRANCH=$CF_PAGES_BRANCH
-    else
-        # Local testing
-        if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
-            export GIT_ALTERNATE_OBJECT_DIRECTORIES=$WORKDIR/.git/objects
-            if [ ${TEST_SHA:+isset} ] ; then
-                SOURCE_COMMIT_SHA="$TEST_SHA"
-            fi
-            SOURCE_BRANCH=unknown-local/source-branch
-        fi
-    fi
-
-    # Ensure CACHE_UNBUST_KEY is set. There is no default, because it should be
+    # Ensure UNBUST_CACHE_DBNAME is set. There is no default, because it should be
     # secret
-    [[ ${CACHE_UNBUST_KEY:+isset} ]]
 set -x
-    if [ ! -d "${CACHE_UNBUST_KEY}" ] ; then
-        # mkdir -p "${CACHE_UNBUST_KEY}"
+    if [ ! -d "${UNBUST_CACHE_DBNAME}" ] ; then
+        # mkdir -p "${UNBUST_CACHE_DBNAME}"
         command git -c init.defaultBranch=published init --template=/dev/null "${dbdir}"
         git config pack.packSizeLimit 20m
         git config commit.gpgSign false
@@ -70,12 +116,12 @@ set -x
         git config user.name "Archivium Cache Bot"
         git config user.email "unbust-cache-script@archivium.org"
         
-        # git remote add "$remotename" "${dburl}/${CACHE_UNBUST_KEY}/$dbdir"
+        # git remote add "$remotename" "${dburl}/${UNBUST_CACHE_DBNAME}/$dbdir"
 
         # Local testing
         if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
-            git remote set-url "$remotename" "${output_dir}.public/${CACHE_UNBUST_KEY}/$GIT_DIR"
-            rsync -a "${output_dir}.public/${CACHE_UNBUST_KEY}/$GIT_DIR" "${CACHE_UNBUST_KEY}/"
+            git remote set-url "$remotename" "${output_dir}.public/${UNBUST_CACHE_DBNAME}/$GIT_DIR"
+            rsync -a "${output_dir}.public/${UNBUST_CACHE_DBNAME}/$GIT_DIR" "${UNBUST_CACHE_DBNAME}/"
         fi
         # End local testing
 
@@ -83,7 +129,9 @@ set -x
             :
         else
             set -o pipefail
-            if ! curl -s --fail "${dburl}/${CACHE_UNBUST_KEY}" | tar xjv -C "${dbdir}" ; then
+            if ! curl -s --fail "${dburl}/${UNBUST_CACHE_DBNAME}" | 
+                openssl dec -$ENCRYPTION_CIPHER -pass "passin:$UNBUST_CACHE_KEY" |
+                tar xjv -C "${dbdir}" ; then
             # if true ; then
                 git commit --allow-empty -m "Initial commit"
                 git branch empty
@@ -99,10 +147,10 @@ set -x
 # deprecated
 deprecation_refill() {
     local dburl="$1"
-    local obs=${CACHE_UNBUST_TIME:-$DEFAULT_CACHE_UNBUST_TIME} obstime
+    local obs=${UNBUST_CACHE_TIME:-$DEFAULT_UNBUST_CACHE_TIME} obstime
 
     if ! obstime=$(date --date="$obs" "+%s") ; then
-        obstime=$(date --date="$DEFAULT_CACHE_UNBUST_TIME" "+%s")
+        obstime=$(date --date="$DEFAULT_UNBUST_CACHE_TIME" "+%s")
     fi
 
     local num_deprecated_commits=$(git rev-list --topo-order --skip=1 --since=${obstime} --count HEAD)
@@ -188,7 +236,7 @@ sitestats() {
 
 deprecation_track() {
     # public location where the website is published. The deprecation DB will
-    # be stored in the $CACHE_UNBUST_KEY directory at that location
+    # be stored in the $UNBUST_CACHE_DBNAME directory at that location
     local dburl="$1"
     local msg="${2:-Published $(sitestats)}"
 
@@ -256,8 +304,10 @@ set -x
 
     git checkout empty
     # FIXME: Max size 25M, then we have to split
-    tar cjf "${CACHE_UNBUST_KEY}" --remove-files -C "${dbdir}" "$GIT_DIR"
-    # mv "${CACHE_UNBUST_KEY}/$GIT_DIR" "${CACHE_UNBUST_KEY}/$dbdir"
+    tar cjf "${UNBUST_CACHE_DBNAME}" --remove-files -C "${dbdir}" "$GIT_DIR" |
+       openssl enc -$ENCRYPTION_CIPHER -pass "passin:$UNBUST_CACHE_KEY" -out "${UNBUST_CACHE_DBNAME}"
+    # FIXME: Max size 25M, then we have to split
+    # mv "${UNBUST_CACHE_DBNAME}/$GIT_DIR" "${UNBUST_CACHE_DBNAME}/$dbdir"
 
     find
     rm -rf $dbdir
@@ -265,11 +315,7 @@ set -x
 
 FN=$(command date "+%F %H%M%S")
 
-if [ ${CF_PAGES:+isset} ] ; then
-    DEPRECATION_MESSAGE="Published ${CF_PAGES_BRANCH} (${CF_PAGES_COMMIT_SHA::8}) at ${CF_PAGES_URL}"
-else
-    DEPRECATION_MESSAGE=""
-fi
+CND_set_vars
 
 command git remote -v
 set -x
