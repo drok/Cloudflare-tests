@@ -13,24 +13,38 @@
 # or longer, can still find the resources they need, even if the published
 # website includes newer versions of the same resources.
 #
-# It should run in the same directory as the build output, and requires only two
-# environment variables:
+# It requires two arguments and two environment variables:
 #
-# PUBLIC_URL - will be used to fetch the old versions of the files and the
-#              persistence records (a simple git repo)
-# UNBUST_CACHE_KEY - a secret key used to encrypt the persistence records
+# Arguments:
+#    unbust.sh <outputdir> <initial commit hash>
+#       <outputdir> - The directory where the files to be published are
+#                    (the build output directory). It can be relative.
+#       <initial commit hash> - The commit hash in the source repo that is
+#                    first "unbusted". The script will initialize the tracking
+#                    DB, but only if the currently deployed commit matches this
+#                    in order to avoid accidentally reinitializing the DB due
+#                    to misconfiguration or other errors.
+#
+# Environment:
+#
+#       PUBLIC_URL - will be used to fetch the old versions of the files and the
+#                   persistence records (a simple git repo)
+#       UNBUST_CACHE_KEY - a secret key used to encrypt the persistence records
 #
 # Other optional setting can be set:
 #
-# UNBUST_CACHE_TIME - the time period to persist old files (default=3 months)
-# UNBUST_CACHE_DBNAME - the encrypted tarball containing the persistence data.
-#                       This will be available as $PUBLIC_URL/$UNBUST_CACHE_DBNAME,
-#                       eg, https://example.com/unbust-cache-db
+#       UNBUST_CACHE_TIME - the time period to persist old files
+#                   (default=3 months)
+#       UNBUST_CACHE_DBNAME - the encrypted tarball filename containing the
+#                   persistence database. This will be available as
+#                   $PUBLIC_URL/$UNBUST_CACHE_DBNAME, (default=unbust-cache-db)
+#                       eg, "my-unbust-db"
 #
 # For more details, or bug reports, see https://github.com/archivium/unbust
 #
-# Typical build cmdline:
-#        npm run build && cd out && ../unbust.sh
+# Typical CDN deployment build cmdline example (ie, run unbust.sh after output
+# is generated):
+#        npm run build && ../tools/unbust.sh out a7ec317
 # ##########################################################################
 
 error=0
