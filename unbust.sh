@@ -68,8 +68,6 @@ set -o pipefail
 # ############# CDN support hooks ############################
 #
 # CDN_set_vars() must set the following variables:
-# - SOURCE_COMMIT_SHA   - The commit SHA being deployed
-# - SOURCE_BRANCH       - The branch being deployed
 # - DEPRECATION_MESSAGE - The msg to as commit message when storing state in
 #                         the db. In case you ever look at the db (which is
 #                         a simple git repo tar.bz2 and encrypted), this can
@@ -77,9 +75,6 @@ set -o pipefail
 CDN_set_vars()  {
     # Cloudflare Pages
     if [ ${CF_PAGES:+isset} ] ; then
-        export GIT_ALTERNATE_OBJECT_DIRECTORIES=$REPO_DIR/.git/objects
-        SOURCE_COMMIT_SHA="$CF_PAGES_COMMIT_SHA"
-        SOURCE_BRANCH=$CF_PAGES_BRANCH
         DEPRECATION_MESSAGE="Published $(sitestats) from ${CF_PAGES_BRANCH} (${CF_PAGES_COMMIT_SHA::8}), at ${CF_PAGES_URL}"
     else
         >&2 echo "ERROR: This CDN is not yet supported."
@@ -93,8 +88,6 @@ ENCRYPTION_CIPHER=(-aes-256-cbc -md sha512 -pbkdf2 -iter 1000000 -salt -pass "pa
 
 
 # FIXME: git repack fails because tree objects are not added to the db
-
-unset SOURCE_COMMIT_SHA
 
 # FIXME: Implement deployment to subdir of host (ie, wget needs to --cut-dirs)
 DEFAULT_UNBUST_CACHE_TIME="3 months ago"
@@ -118,17 +111,38 @@ deprecation_setup() {
     # secret
 
     if [ ! -d "${UNBUST_CACHE_DBNAME}" ] ; then
-        command git -c init.defaultBranch=published init --quiet --template=/dev/null "${dbdir}"
-        git config pack.packSizeLimit 20m
-        git config commit.gpgSign false
-        git config gc.pruneExpire now
-        git config user.name "Archivium Cache Bot"
-        git config user.email "unbust-cache-script@archivium.org"
         
-
-        if ! curl -s --fail "${dburl}/${UNBUST_CACHE_DBNAME}" | 
+        local fetch_status
+        if ! fetch_status=$(curl -L -s --fail -H "Cache-control: no-cache, private" --write-out "%http_code" "${dburl}/${UNBUST_CACHE_DBNAME}" |
             openssl enc "${ENCRYPTION_CIPHER[@]}" -d |
-            tar xjv -C "${dbdir}" ; then
+            tar xjv -C "${dbdir}") ; then
+
+            # If the db is empty, create a new one
+            # But prevent inadventently resetting persistence state due to
+            # misconfiguration or a network error
+            local HEAD=$(command git rev-parse HEAD)
+            local initial_sha=$(git rev-parse $INITIAL_COMMIT_SHA)
+            if [ "$HEAD" != "$initial_sha" ] ; then
+                >&2 echo "ERROR: The persistence database could not be fetched."
+                >&2 echo "       Refusing to create a new one because the initial commit hash is not the same as the current commit."
+                if [[ $fetch_status == 200 ]] ; then
+                    >&2 echo "       A persitence DB exists, but cannot be decrypted."
+                    >&2 echo "       This is a configuration error (UNBUST_CACHE_KEY mismatch?)"
+                    >&2 echo "       To create a new DB set $HEAD as initial-sha argument to the script."
+                elif [[ $fetch_status == 404 ]] ; then
+                    >&2 echo "       No persistence DB exists at ${dburl}/${UNBUST_CACHE_DBNAME} (404)."
+                    >&2 echo "       This is a configuration error (PUBLIC_URL mismatch?)"
+                else
+                    >&2 echo "       If it's a network error, try again later. Curl said ($fetch_status)."
+                fi
+                exit 1
+            fi
+            command git -c init.defaultBranch=published init --quiet --template=/dev/null "${dbdir}"
+            git config pack.packSizeLimit 20m
+            git config commit.gpgSign false
+            git config gc.pruneExpire now
+            git config user.name "Archivium Cache Bot"
+            git config user.email "unbust-cache-script@archivium.org"
             git commit --allow-empty -m "Initial commit"
             git branch empty
         else
@@ -256,6 +270,45 @@ deprecation_track() {
 
     rm -rf $dbdir
 }
+
+fetch_repo() {
+    :
+}
+
+usage() {
+    echo "Usage: $0 [-f] <output directory> <initial commit hash>"
+    echo "  -f  Fetch the repo (eg, for record keeping)"
+    echo "  -h  Show this help"
+}
+
+unset opt OPTARG
+OPTIND=1
+while getopts ":fh" opt ; do
+    case $opt in
+        f) fetch_repo
+                ;;
+        h) usage
+                exit 0
+                ;;
+        \?) >&2 echo "Invalid option: -$OPTARG"
+                ;;
+        :) >&2 echo "Option -$OPTARG requires an argument in ${FUNCNAME[0]}."
+                ;;
+    esac
+done
+
+[[ $# -ne 2 ]] && {
+    usage
+    exit 1
+}
+
+[ ! -d "$1" ] && {
+    >&2 echo "Not a directory: $1"
+}
+
+cd "$1"
+
+INITIAL_COMMIT_SHA="$2"
 
 CDN_set_vars
 
