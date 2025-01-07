@@ -1,8 +1,36 @@
 #!/bin/bash
 
-ENCRYPTION_CIPHER=aes-128-gcm
+# ############## Unbust cache v.1.0.0 ###############
+#
+# This script persists files published to a CDN across builds, for a given
+# period of time (UNBUST_CACHE_TIME, default=3 months)
+#
+# It should be used together with filenames containing build ID (eg,
+# "myapp.89abcd.min.js"). Without this persistence, when new versions are
+# published, browsers that still request the old files would receive 404's
+# 
+# The persistence ensures that active user sessions, which can last for months
+# or longer, can still find the resources they need, even if the published
+# website includes newer versions of the same resources.
+#
+# It should run in the same directory as the build output, and requires only two
+# environment variables:
+#
+# PUBLIC_URL - will be used to fetch the old versions of the files and the
+#              persistence records (a simple git repo)
+# UNBUST_CACHE_KEY - a secret key used to encrypt the persistence records
+#
+# Other optional setting can be set:
+#
+# UNBUST_CACHE_TIME - the time period to persist old files (default=3 months)
+# UNBUST_CACHE_DBNAME - the encrypted tarball containing the persistence data.
+#                       This will be available as $PUBLIC_URL/$UNBUST_CACHE_DBNAME,
+#                       eg, https://example.com/unbust-cache-db
+#
+# For more details, or bug reports, see https://github.com/archivium/unbust
+#
+# ##########################################################################
 
-set
 error=0
 
 # Required control variables:
@@ -26,9 +54,20 @@ error=0
 }
 # ############# End of configuration #########################
 
+set -o errexit
+set -o pipefail
+
+ls -la
+
+[[ $error == 0 ]] || {
+    >&2 echo "See https://github.com/archivium/unbust"
+    exit 1
+}
+
+
 # ############# CDN support hooks ############################
 #
-# CND_set_vars() must set the following variables:
+# CDN_set_vars() must set the following variables:
 # - SOURCE_COMMIT_SHA   - The commit SHA being deployed
 # - SOURCE_BRANCH       - The branch being deployed
 # - DEPRECATION_MESSAGE - The msg to as commit message when storing state in
@@ -36,6 +75,7 @@ error=0
 #                         a simple git repo tar.bz2 and encrypted), this can
 #                         help with debugging.
 CDN_set_vars()  {
+    # Cloudflare Pages
     if [ ${CF_PAGES:+isset} ] ; then
         export GIT_ALTERNATE_OBJECT_DIRECTORIES=$REPO_DIR/.git/objects
         SOURCE_COMMIT_SHA="$CF_PAGES_COMMIT_SHA"
@@ -53,16 +93,9 @@ CDN_set_vars()  {
         fi
     fi
 }
-
 # ################ End of CDN support hooks #####################
 
-set -o errexit
-set -o pipefail
-
-[[ $error == 0 ]] || {
-    >&2 echo "See https://github.com/archivium/unbust"
-    exit 1
-}
+ENCRYPTION_CIPHER=(-aes-256-cbc -md sha512 -pbkdf2 -iter 1000000 -salt -pass "pass:$UNBUST_CACHE_KEY")
 
 # Local testing
 if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
@@ -130,7 +163,7 @@ set -x
         else
             set -o pipefail
             if ! curl -s --fail "${dburl}/${UNBUST_CACHE_DBNAME}" | 
-                openssl dec -$ENCRYPTION_CIPHER -pass "passin:$UNBUST_CACHE_KEY" |
+                openssl enc "${ENCRYPTION_CIPHER[@]}" -d |
                 tar xjv -C "${dbdir}" ; then
             # if true ; then
                 git commit --allow-empty -m "Initial commit"
@@ -305,7 +338,7 @@ set -x
     git checkout empty
     # FIXME: Max size 25M, then we have to split
     tar cjf "${UNBUST_CACHE_DBNAME}" --remove-files -C "${dbdir}" "$GIT_DIR" |
-       openssl enc -$ENCRYPTION_CIPHER -pass "passin:$UNBUST_CACHE_KEY" -out "${UNBUST_CACHE_DBNAME}"
+       openssl enc "${ENCRYPTION_CIPHER[@]}" -out "${UNBUST_CACHE_DBNAME}"
     # FIXME: Max size 25M, then we have to split
     # mv "${UNBUST_CACHE_DBNAME}/$GIT_DIR" "${UNBUST_CACHE_DBNAME}/$dbdir"
 
@@ -315,7 +348,7 @@ set -x
 
 FN=$(command date "+%F %H%M%S")
 
-CND_set_vars
+CDN_set_vars
 
 command git remote -v
 set -x
