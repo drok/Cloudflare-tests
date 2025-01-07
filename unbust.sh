@@ -110,46 +110,61 @@ deprecation_setup() {
     # Ensure UNBUST_CACHE_DBNAME is set. There is no default, because it should be
     # secret
 
-    if [ ! -d "${UNBUST_CACHE_DBNAME}" ] ; then
+	if [ -f "${UNBUST_CACHE_DBNAME}" ] ; then
+		>&2 echo "ERROR: A file named '${UNBUST_CACHE_DBNAME}' (UNBUST_CACHE_DBNAME) already exists in the output directory."
+		>&2 echo "       Set UNBUST_CACHE_DBNAME to another filename or remove the offending file from the output"
+		exit 1
+	fi
         
-        local fetch_status
-        if ! fetch_status=$(curl -L -s --fail -H "Cache-control: no-cache, private" --write-out "%http_code" "${dburl}/${UNBUST_CACHE_DBNAME}" |
-            openssl enc "${ENCRYPTION_CIPHER[@]}" -d |
-            tar xjv -C "${dbdir}") ; then
+	local fetch_status
+	local tmp=$(mktemp)
+	if ! fetch_status=$(curl -L --fail -H "Cache-control: no-cache, private" --write-out "%{http_code}" -o $tmp "${dburl}/${UNBUST_CACHE_DBNAME}") ; then
+	
+	    if [[ $fetch_status == "000" ]] ; then
+		>&2 echo "ERROR: The persistence database could not be fetched from '${dburl}/${UNBUST_CACHE_DBNAME}'."
+		>&2 echo "       If it's a network error, try again later. Is the hostname correct?"
+		exit 1
+	    fi
 
-            # If the db is empty, create a new one
-            # But prevent inadventently resetting persistence state due to
-            # misconfiguration or a network error
-            local HEAD=$(command git rev-parse HEAD)
-            local initial_sha=$(git rev-parse $INITIAL_COMMIT_SHA)
-            if [ "$HEAD" != "$initial_sha" ] ; then
-                >&2 echo "ERROR: The persistence database could not be fetched."
-                >&2 echo "       Refusing to create a new one because the initial commit hash is not the same as the current commit."
-                if [[ $fetch_status == 200 ]] ; then
-                    >&2 echo "       A persitence DB exists, but cannot be decrypted."
-                    >&2 echo "       This is a configuration error (UNBUST_CACHE_KEY mismatch?)"
-                    >&2 echo "       To create a new DB set $HEAD as initial-sha argument to the script."
-                elif [[ $fetch_status == 404 ]] ; then
-                    >&2 echo "       No persistence DB exists at ${dburl}/${UNBUST_CACHE_DBNAME} (404)."
-                    >&2 echo "       This is a configuration error (PUBLIC_URL mismatch?)"
-                else
-                    >&2 echo "       If it's a network error, try again later. Curl said ($fetch_status)."
-                fi
-                exit 1
-            fi
-            command git -c init.defaultBranch=published init --quiet --template=/dev/null "${dbdir}"
-            git config pack.packSizeLimit 20m
-            git config commit.gpgSign false
-            git config gc.pruneExpire now
-            git config user.name "Archivium Cache Bot"
-            git config user.email "unbust-cache-script@archivium.org"
-            git commit --allow-empty -m "Initial commit"
-            git branch empty
-        else
-            git checkout "$branchname"
-        fi
-    fi
-}
+	    # If the db is empty, create a new one
+	    # But prevent inadventently resetting persistence state due to
+	    # misconfiguration or a network error
+	    pushd
+	    local HEAD initial_sha
+	    if ! HEAD=$(command git rev-parse HEAD) || ! initial_sha=$(command git rev-parse $INITIAL_COMMIT_SHA) || [ "$HEAD" != "$initial_sha" ]; then
+
+		>&2 echo "ERROR: The persistence database could not be fetched."
+		>&2 echo "       Refusing to create a new one because the initial commit hash is not the same as the current commit."
+		if [[ $fetch_status == 404 ]] ; then
+		    >&2 echo "       No persistence DB exists at ${dburl}/${UNBUST_CACHE_DBNAME} (404)."
+		    >&2 echo "       This is a configuration error (PUBLIC_URL mismatch?)"
+		else
+		    >&2 echo "       If it's a network error, try again later. Curl said ($fetch_status)."
+		fi
+		exit 1
+	    fi
+	    pushd
+	    command git -c init.defaultBranch=published init --quiet --template=/dev/null "${dbdir}"
+	    git config pack.packSizeLimit 20m
+	    git config commit.gpgSign false
+	    git config gc.pruneExpire now
+	    git config core.logAllRefUpdates false
+	    git config user.name "Archivium Cache Bot"
+	    git config user.email "unbust-bot@archivium.org"
+	    git commit --allow-empty -m "Initial commit"
+	    git branch empty
+	else
+	    if ! openssl enc "${ENCRYPTION_CIPHER[@]}" -d -in $tmp |
+		    tar xj -C "${dbdir}" ; then
+		>&2 echo "ERROR: The persistence database could not be decrypted."
+		>&2 echo "       This is a configuration error (UNBUST_CACHE_KEY mismatch?)"
+		>&2 echo "       To create a new DB set $HEAD as initial-sha argument to the script."
+		exit 1
+	    fi
+	    git checkout -q "$branchname"
+	fi
+	rm -f $tmp
+	}
 
 # Fetch from the currently published version of the site the files which are
 # deprecated
@@ -160,6 +175,11 @@ deprecation_refill() {
     if ! obstime=$(date --date="$obs" "+%s") ; then
         obstime=$(date --date="$DEFAULT_UNBUST_CACHE_TIME" "+%s")
     fi
+
+    # Trim DB to only the relevant history. This ensures that increasing the UNBUST_CACHE_TIME does
+    # not result in errors due to already missing files.
+    # It also keeps the size of the DB from growing
+    git pull --shallow-since=${obstime} .
 
     local num_deprecated_commits=$(git rev-list --topo-order --skip=1 --since=${obstime} --count HEAD)
 
@@ -241,7 +261,7 @@ deprecation_track() {
     local branchname=published
     local remotename=public
 
-    local dbdir=$(mktemp -d)
+    local dbdir=$(mktemp -td unbust-db.XXXXXX)
 
     # local dbdir=db
 
@@ -254,7 +274,7 @@ deprecation_track() {
 
     git add -A files
 
-    git commit --allow-empty -m "$msg"
+    git commit -q --allow-empty -m "$msg"
 
     git gc --quiet
     git prune-packed
@@ -263,7 +283,8 @@ deprecation_track() {
 
     deprecation_refill "${dburl}"
 
-    git checkout empty
+    git checkout -q empty
+
     # FIXME: Max size 25M, then we have to split
     tar cj --remove-files -C "${dbdir}" "$GIT_DIR" |
        openssl enc "${ENCRYPTION_CIPHER[@]}" -out "${UNBUST_CACHE_DBNAME}"
@@ -306,7 +327,7 @@ done
     >&2 echo "Not a directory: $1"
 }
 
-cd "$1"
+pushd "$1"
 
 INITIAL_COMMIT_SHA="$2"
 
