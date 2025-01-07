@@ -5,7 +5,8 @@ if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
     TEST_SHA="377adeb59f3f3256d7ddee3e2e9ca09361507bd4"
 fi
 
-LINK_PUBLISHED_HISTORY_TO_SOURCE_HISTORY=1
+# FIXME: git repack fails because tree objects are not added to the db
+LINK_PUBLISHED_HISTORY_TO_SOURCE_HISTORY=""
 
 unset SOURCE_COMMIT_SHA
 
@@ -20,6 +21,7 @@ else
     output_dir=out
 fi
 
+# FIXME: Implement deployment to subdir of host (ie, wget needs to --cut-dirs)
 PUBLIC_URL="https://cloudflare-tests.pages.dev"
 DEFAULT_CACHE_UNBUST_TIME="3 months ago"
 
@@ -83,10 +85,12 @@ set -x
         else
             set -o pipefail
             if ! curl -s --fail "${dburl}/${CACHE_UNBUST_KEY}/$dbdir" | tar xjv -C "${CACHE_UNBUST_KEY}" ; then
+            # if true ; then
                 git commit --allow-empty -m "Initial commit"
+                git branch empty
             else
                 git checkout "$branchname"
-                git remote remove "$remotename"
+                # git remote remove "$remotename"
             fi
         fi
     fi
@@ -155,7 +159,9 @@ deprecation_refill() {
                     return 1
                 fi
             else
-                if ! wget --retry-connrefused --input-file=$list --base="$dburl" -o "$wgetlog" ; then
+                # FIXME: If through some mapping, the deployed files appear in a subdirectory,
+                # need to cut some directories
+                if ! wget --retry-connrefused --recursive --no-host-directories --input-file=$list --base="$dburl" -o "$wgetlog" ; then
                     echo "# ##########################################################"
                     echo "# #######  Failed to download deprecated files: ############"
                     echo "# ##########################################################"
@@ -212,16 +218,32 @@ set -x
         local commit=$(git commit-tree -p $parent -p $SOURCE_COMMIT_SHA -m "$msg" ${tree})
         git update-ref -m "$msg" refs/heads/$branchname $commit
         # git replace --graft $SOURCE_COMMIT_SHA
+
+        # Copy the commit object from the source repo so rev-parse doesn't fail
         echo $SOURCE_COMMIT_SHA >> "${CACHE_UNBUST_KEY}/$GIT_DIR/shallow"
-        git log --oneline --graph --decorate --all
+        # FIXME: WORKDIR should not be here
+        echo $SOURCE_COMMIT_SHA | command git -C $WORKDIR pack-objects --stdout | GIT_ALTERNATE_OBJECT_DIRECTORIES= git unpack-objects
+        # git log --oneline --graph --decorate --all
+        GIT_ALTERNATE_OBJECT_DIRECTORIES= git cat-file -p $SOURCE_COMMIT_SHA
+        GIT_ALTERNATE_OBJECT_DIRECTORIES= git cat-file -p $branchname
+        cat $CACHE_UNBUST_KEY/$GIT_DIR/shallow
     else
         git commit -m "$msg" || :
     fi
 
 # set +x
     git gc --quiet
+    # GIT_ALTERNATE_OBJECT_DIRECTORIES= git repack -adl
+    git prune-packed
+        # GIT_ALTERNATE_OBJECT_DIRECTORIES= git cat-file -p $SOURCE_COMMIT_SHA
+        # GIT_ALTERNATE_OBJECT_DIRECTORIES= git cat-file -p $branchname
+
     git pack-refs --all --prune
+        # GIT_ALTERNATE_OBJECT_DIRECTORIES= git cat-file -p $SOURCE_COMMIT_SHA
+        # GIT_ALTERNATE_OBJECT_DIRECTORIES= git cat-file -p $branchname
+
     git update-server-info
+    find 
 
     # Local testing
     if [ "${DEBSIGN_KEYID}" == "8F5713F1" ] ; then
@@ -230,9 +252,12 @@ set -x
 
     deprecation_refill "${dburl}"
 
+    git checkout empty
     # FIXME: Max size 25M, then we have to split
-    tar cjvf $dbdir "${CACHE_UNBUST_KEY}/$GIT_DIR"
+    tar cjf "${CACHE_UNBUST_KEY}"/$dbdir --remove-files -C "${CACHE_UNBUST_KEY}" "$GIT_DIR"
     # mv "${CACHE_UNBUST_KEY}/$GIT_DIR" "${CACHE_UNBUST_KEY}/$dbdir"
+
+    find
 }
 
 FN=$(command date "+%F %H%M%S")
@@ -243,6 +268,7 @@ else
     DEPRECATION_MESSAGE=""
 fi
 
+command git remote -v
 set -x
 mkdir -p "$output_dir"
 WORKDIR=$PWD
@@ -253,8 +279,6 @@ mkdir subdir
 echo hello >"subdir/$FN"
 
 deprecation_track "$PUBLIC_URL" "$DEPRECATION_MESSAGE"
-
-find
 
 
 # Local testing
