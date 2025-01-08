@@ -121,6 +121,9 @@ if [[ "${CF_PAGES}" == 1 ]] ; then
 /*.css
   Cache-Control: max-age=63072000, immutable
 
+/favicon.ico
+  Cache-Control: max-age=63072000, immutable
+
 # This is information, must be timely, minimal cache
 /subdir/*.txt
   Cache-Control: max-age=120
