@@ -55,30 +55,6 @@ echo "Updated" > $output_dir/Updated-$FN
 # Turn off SPA mode in the subdirectory
 echo "File Not Found (404)" > $output_dir/subdir/404.html
 
-# Set up caching
-if [[ "${CF_PAGES}" == 1 ]] ; then
-  cat >> $output_dir/_headers <<EOF
-
-# Versioned assets
-/*.css
-  Cache-Control: max-age=63072000, immutable
-
-# Unversioned assets
-/subdir/unversioned-file
-  Cache-Control: max-age=31536000, must-revalidate
-
-/*.html
-  Cache-Control: max-age=31536000, must-revalidate
-
-/
-  Cache-Control: max-age=31536001, must-revalidate
-
-/subdir/
-  Cache-Control: max-age=31536002, must-revalidate
-
-EOF
-fi
-
 # Generate file listing
 
 cat >$output_dir/subdir/index.html <<!

@@ -56,3 +56,22 @@ h2 {
     border: 1px solid #ddd; /* faint box around the text */
     border-radius: 3px; /* rounded corners */
   }
+
+table {
+    border-collapse: collapse;
+    width: 80%; /* adjusted width to center the table */
+    background-color: #ffffff;
+    margin: 0 auto; /* added to center the table */
+}
+
+th {
+    font-weight: bold;
+    border-bottom: 1px solid #000000;
+    padding: 8px;
+    text-align: left;
+}
+
+td {
+    border-bottom: 1px solid #dddddd;
+    padding: 8px;
+}
