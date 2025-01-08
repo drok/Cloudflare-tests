@@ -283,7 +283,7 @@ record_caching_state() {
 	local same_source_sha=0
 
 	if [[ ${SOURCE_COMMIT_SHA:+isset} ]] ; then
-		while read -r trailer content ; do
+		while read -r trailer content unused ; do
 			case ${trailer,,} in
 				source)
 					if [[ $content == ${SOURCE_COMMIT_SHA::10} ]] ; then
@@ -308,7 +308,7 @@ record_caching_state() {
 		102) cache_state_msg="Stable"
 		;;
 	esac
-set -x
+
 	if (( cache_state == 0 || (cache_state >= 100 && cache_state < 119) )) ; then
 		if [[ ${cache_state_msg:+isset} ]] ; then
 			trailers+=(--trailer "Cache: $cache_state - ${cache_state_msg}")
@@ -323,7 +323,7 @@ set -x
 		# 	git commit --allow-empty -m "$cache_state_msg"
 		# fi
 	elif [[ $cache_state == 1 ]] ; then
-		>&2 echo "ERROR: Deployment rejected by cache policy script $cache_logic_script."
+		>&2 echo "ERROR: Deployment rejected by cache policy script \"$cache_logic_script $same_source_sha $last_commit_time $cache_state\"."
 		exit 1
 	else
 		>&2 echo "ERROR: Cache policy script $cache_logic_script failed ($cache_state)."
@@ -353,7 +353,6 @@ deprecation_track() {
 
 	git add -A files
 
-set -x
 	local last_commit_time
 	if [[ ${cache_logic_script:+isset} ]] ; then
 		last_commit_time=$(git log -1 --format=%at)
@@ -369,8 +368,9 @@ set -x
 	if [[ ${#trailers[@]} -gt 0 ]] ; then
 		msg=$(echo "$msg" | git interpret-trailers "${trailers[@]}")
 	fi
-set +x
+
 	git commit -q --allow-empty -m "$msg"
+	git show -s
 
 	git gc --quiet
 	git prune-packed
@@ -379,7 +379,6 @@ set +x
 
 	deprecation_refill "${dburl}"
 
-	git show -p
 	git checkout -q empty
 
 	# FIXME: Max size 25M, then we have to split
