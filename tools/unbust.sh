@@ -96,10 +96,14 @@ set -o pipefail
 #                         the db. In case you ever look at the db (which is
 #                         a simple git repo tar.bz2 and encrypted), this can
 #                         help with debugging.
+# - SOURCE_COMMIT_SHA   - The commit hash of the source repo that is deployed
+# - DEPLOYED_AT_URL		- The URL of the deployed site
 CDN_set_vars()  {
 	# Cloudflare Pages
 	if [ ${CF_PAGES:+isset} ] ; then
-		DEPRECATION_MESSAGE="Published $(sitestats) from ${CF_PAGES_BRANCH} (${CF_PAGES_COMMIT_SHA::8}), at ${CF_PAGES_URL}"
+		DEPRECATION_MESSAGE="Published $(sitestats) from ${CF_PAGES_BRANCH}"
+		SOURCE_COMMIT_SHA=$CF_PAGES_COMMIT_SHA
+		DEPLOYED_AT_URL=$CF_PAGES_URL
 	else
 		>&2 echo "ERROR: This CDN is not yet supported."
 		return 1
@@ -182,7 +186,7 @@ deprecation_setup() {
 			>&2 echo "       To create a new DB set $HEAD as initial-sha argument to the script."
 			exit 1
 		fi
-		git checkout -q "$branchname"
+		git checkout -q "$publish_branch"
 	fi
 	rm -f $tmp
 }
@@ -270,13 +274,55 @@ sitestats() {
 	echo "${num_files} files, ${size[0]}"
 }
 
+unset cache_state_msg
+trailers=()
+record_caching_state() {
+	local cache_logic_script=$1
+	local cache_state=0
+	local same_source_sha=0
+
+	if [[ ${SOURCE_COMMIT_SHA:+isset} ]] ; then
+		while read -r trailer content ; do
+			case ${trailer,,} in
+				souce) if [[ $content == $SOURCE_COMMIT_SHA ]] ; then
+								same_source_sha=1
+							  fi
+							;;
+			esac
+		done <(git show -s --no-decorate | git interpret-trailers --parse --trim-empty)
+	fi
+
+	$cache_logic_script $same_source_sha $time_since_last_commit || cache_state=$?
+
+	case $cache_state in
+		100) cache_state_msg="Hotfix-ready"
+		;;
+		101) cache_state_msg="Maintenance-ready"
+		;;
+		102) cache_state_msg="Stable"
+		;;
+	esac
+
+	if [[ ${cache_state_msg:+isset} ]] ; then
+		trailers+=(--trailer "Cache: ${cache_state_msg}")
+		# if git checkout $cache_branch ; then
+		# 	git merge --no-edit -m "$cache_state_msg" "$publish_branch"
+		# else
+		# 	git checkout -b $cache_branch
+		# 	git commit --allow-empty -m "$cache_state_msg"
+		# fi
+	fi
+}
+
 # Implentation choices
-branchname=published
+publish_branch=published
+cache_branch=caching
 deprecation_track() {
 	# public location where the website is published. The deprecation DB will
 	# be stored in the $UNBUST_CACHE_DBNAME directory at that location
 	local dburl="$1"
 	local msg="${2:-Published $(sitestats)}"
+	local cache_logic_script=$3
 
 	# Implentation choices
 	local remotename=public
@@ -288,6 +334,22 @@ deprecation_track() {
 	find -type f -printf '%P\n' >"${dbdir}"/files
 
 	git add -A files
+
+	local time_since_last_commit
+	if [[ ${cache_logic_script:+isset} ]] && [ -x ${cache_logic_script} ] ; then
+		time_since_last_commit=$(git log -1 --format=%at)
+	fi
+
+	if [[ ${time_since_last_commit:+isset} ]] ; then
+		record_caching_state "$cache_logic_script" "$time_since_last_commit"
+	fi
+
+	if [[ ${SOURCE_COMMIT_SHA:+isset} ]] ; then
+		trailers+=(--trailer "Source: $SOURCE_COMMIT_SHA")
+	fi
+	if [[ ${#trailers[@]} -gt 0 ]] ; then
+		msg=$(echo "$msg" | git interpret-trailers "${trailers[@]}")
+	fi
 
 	git commit -q --allow-empty -m "$msg"
 
@@ -330,7 +392,7 @@ fetch_repo() {
 				exit 1
 		fi
 		command git remote add cdn "${dburl}"
-		command git checkout -q "$branchname"
+		command git checkout -q "$publish_branch"
 	else
 		if ! openssl enc "${ENCRYPTION_CIPHER[@]}" -d -in $tmp |
 			tar xj --transform "s@\.git/packed-refs@.git/packed-refs.cdn@" .git/objects/pack .git/packed-refs ; then
@@ -338,11 +400,11 @@ fetch_repo() {
 				>&2 echo "       This is a configuration error (UNBUST_CACHE_KEY mismatch?)"
 				exit 1
 		fi
-		local remote_branch=($(grep "refs/heads/$branchname" .git/packed-refs.cdn))
+		local remote_branch=($(grep "refs/heads/$publish_branch" .git/packed-refs.cdn))
 		if [[ "${#remote_branch[@]}" == 2 ]] ; then
 			mkdir -p .git/refs/remotes/cdn
-			echo ${remote_branch[0]} > .git/refs/remotes/cdn/$branchname
-			command git merge --ff-only cdn/$branchname
+			echo ${remote_branch[0]} > .git/refs/remotes/cdn/$publish_branch
+			command git merge --ff-only cdn/$publish_branch
 		fi
 	fi
 	rm -f $tmp
@@ -371,7 +433,7 @@ while getopts ":fh" opt ; do
 	esac
 done
 
-[[ $# -ne 2 ]] && {
+[[ $# -le 2 ]] && {
 	usage
 	exit 1
 }
@@ -386,4 +448,4 @@ INITIAL_COMMIT_SHA="$2"
 
 CDN_set_vars
 
-deprecation_track "$PUBLIC_URL" "$DEPRECATION_MESSAGE"
+deprecation_track "$PUBLIC_URL" "$DEPRECATION_MESSAGE" "${3:-}"
