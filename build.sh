@@ -2,7 +2,12 @@
 
 set -x
 
-FN=$(command date "+%F %H%M%S")
+NOW=$(date +%s)
+date() {
+	command date --date=@$NOW "$@"
+}
+
+FN=$(date "+%F-%H%M%S")
 
 output_dir=out
 mkdir -p $output_dir/subdir
@@ -15,12 +20,11 @@ deterministic_version() {
     local CURRENT_DATE=$(date +"%Y-%m-%d")
 
     # Calculate difference in months
-    local ref_year=$(date -d  "$REFERENCE_DATE" +%Y)
-    local ref_month=$(date -d "$REFERENCE_DATE" +%m)
-    local cur_year=$(date -d  "$CURRENT_DATE" +%Y)
-    local cur_month=$(date -d "$CURRENT_DATE" +%m)
+    local ref_year=$(command date -d  "$REFERENCE_DATE" +%Y)
+    local ref_month=$(command date -d "$REFERENCE_DATE" +%m)
+    local cur_year=$(command date -d  "$CURRENT_DATE" +%Y)
+    local cur_month=$(command date -d "$CURRENT_DATE" +%m)
     version_major=$((cur_year*12 + cur_month - ref_year*12 - ref_month))
-
 }
 
 pastel_colors=(
@@ -45,3 +49,63 @@ sed '
 cp $output_dir/styles.v"$version_major".css $output_dir/subdir
 echo "This unversioned file was last generated on $(date) (with v$version_major release)"> $output_dir/subdir/unversioned-file
 # cp styles.css $output_dir/styles.v"$version_major".css
+
+echo "Updated" > $output_dir/Updated-$FN
+
+# Turn off SPA mode in the subdirectory
+echo "File Not Found (404)" > $output_dir/subdir/404.html
+
+# Set up caching
+if [[ "${CF_PAGES}" == 1 ]] ; then
+  cat >> $output_dir/_headers <<EOF
+
+# Versioned assets
+/*.css
+  Cache-Control: max-age=63072000, immutable
+
+# Unversioned assets
+/subdir/unversioned-file
+  Cache-Control: max-age=31536000, must-revalidate
+
+/*.html
+  Cache-Control: max-age=31536000, must-revalidate
+
+/
+  Cache-Control: max-age=31536001, must-revalidate
+
+/subdir/
+  Cache-Control: max-age=31536002, must-revalidate
+
+EOF
+fi
+
+# Generate file listing
+
+cat >$output_dir/subdir/index.html <<!
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Code Block</title>
+	<style>
+		.code-block {
+			font-family: monospace;
+			background-color: #f7f7f7;
+			padding: 10px;
+			border: 1px solid #ddd;
+			border-radius: 3px;
+			width: 90%;
+			margin: 10px auto;
+		}
+	</style>
+</head>
+<body>
+	<pre class="code-block">
+!
+find $output_dir -type f -ls >>$output_dir/subdir/index.html | sort -n
+cat >>$output_dir/subdir/index.html <<!
+	</pre>
+</body>
+</html>
+!
+
+find $output_dir -type f -ls | sort -n > $output_dir/subdir/generated.txt

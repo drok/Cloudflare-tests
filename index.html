@@ -13,7 +13,7 @@
         <ul>
             <li>Every deployment, the major version of the stylesheet is incremented, and a versioned <span class="code">styles.css</span> file is generated which is referenced in <span class="code">index.html</span>. Each style contains a different pastel background color.</li>
             <li><span class="code">index.html</span> uses style version <span class="code">_VERSION_</span> this release</li>
-            <li>The IFRAME below shows the served <span class="code">subdir/</span> folder which should contain the versioned assets published in the last 6 months (per <span class="code">UNBUST_CACHE_TIME</span>). Note the timestamps.</li>
+            <li>The IFRAME below shows the served <span class="code">subdir/</span> folder which should contain the versioned assets published in the last 6 months (per <span class="code">UNBUST_CACHE_TIME</span>).</li>
             <li>The versioned assets are served with <span class="code">Cache-control: max-age=63072000, immutable</span> which means browsers can cache them up to 2 years, and do not need to re-validate them</li>
             <li>The unversioned entry points <span class="code">index.html</span> are served with <span class="code">Cache-control: max-age=31536000, must-revalidate</span>, meaning browsers will cache it for one year, but re-validate before each use.</li>
         </ul>
@@ -24,8 +24,13 @@
             <li>Github Pages: <a href="//unbust.github.io">https://unbust.github.io</a></li>
         </ul>
     </div>
+    <h2>Generated files:</h2>
     <div class="iframe-container">
-        <iframe src="subdir/" frameborder="0"></iframe>
+        <iframe src="subdir/generated.txt" frameborder="0"></iframe>
+    </div>
+    <h2>Full file list (generated + persisted):</h2>
+    <div class="iframe-container">
+        <iframe src="subdir/all-files.txt" frameborder="0"></iframe>
     </div>
 </body>
 </html>

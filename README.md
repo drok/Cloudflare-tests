@@ -2,7 +2,9 @@
 
 ## The Problem with Cache Busting
 
-Cache busting is a common technique where filenames include a hash or version number (e.g., `app.a7ec317.js` or app.min.js?v=3.33) to force browsers to download new versions of files. While this ensures users get updated assets, it creates a significant problem:
+Cache busting is a common technique where filenames include a hash or version number (e.g., `app.a7ec317.js` or `app.min.js?v=3.33`) to force browsers to download new versions of files. While this ensures users get updated assets, it creates two significant problems:
+
+### Problem 1 - Open tabs are broken
 
 When you deploy a new version of your site, users who still have the old HTML/JS in their browsers will request the old versioned files - but those files no longer exist on the server, resulting in 404 errors and broken experiences.
 
@@ -12,6 +14,12 @@ This is especially problematic for:
 - Mobile apps that may cache content for offline use
 
 The `app.min.js?v=3.33` is especially problematic because the origin will serve the exact same file, regardless of the query string. Simultaneous requests for ?v=2.0 and ?v=3.33 will result in the same file being served, which is wrong for some of the running instances.
+
+### Problem 2 - All browsers receve uncached data
+
+If the `app.min.js?v=3.33` works as intended, proxies will ignore their caches due to the query string, and forward the request to origin. Not only will the browsers have to re-download data they already have, but they do it from the furthest source available, incuring the longest round-trip delay.
+
+Some CDN's might refuse to fall for these shenanigans, and serve the file from the edge. The cost in terms of time, is a shorter round-trip delay than fetching from the origin, but nonetheless, it's a completely avoidable delay.
 
 ## The Solution: Asset Persistence
 

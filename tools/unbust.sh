@@ -257,8 +257,7 @@ deprecation_refill() {
 			local size=($(sed -z 's/\n/\x00/g' $list | du --files0-from=- -sh))
 			local num_files=$(wc -l < $list)
 			git show --quiet --format="format:#  $num_files files, ${size[0]}, published %<|(44)%ar - from: %h %s" $commit
-				
-
+			echo ""
 		fi
 	done < <(git rev-list --topo-order --skip=1 --since=${obstime} HEAD)
 	rm -f $wgetlog $list
