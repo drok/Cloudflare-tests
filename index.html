@@ -15,7 +15,7 @@
             <li><span class="code">index.html</span> uses style version <span class="code">_VERSION_</span> this release</li>
             <li>The IFRAME below shows the served <span class="code">subdir/</span> folder which should contain the versioned assets published in the last 6 months (per <span class="code">UNBUST_CACHE_TIME</span>).</li>
             <li>The versioned assets are served with <span class="code">Cache-control: max-age=63072000, immutable</span> which means browsers can cache them up to 2 years, and do not need to re-validate them</li>
-            <li>The unversioned entry points <span class="code">index.html</span> are served with <span class="code">Cache-control: max-age=31536000, must-revalidate</span>, meaning browsers will cache it for one year, but re-validate before each use.</li>
+            <li>The unversioned entry point <span class="code">index.html</span> is currently served with<span class="code">Cache-Control: max-age=_ENTRY_CACHE_TIME_</span></li>
         </ul>
         The demo is deployed on the following CDNs:
         <ul>

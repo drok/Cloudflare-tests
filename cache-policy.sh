@@ -134,11 +134,11 @@ if [[ "${CF_PAGES}" == 1 ]] ; then
 
 # Unversioned presentation entry-point
 /
-  Cache-Control: max-age=$cache_time, immutable
+  Cache-Control: max-age=$cache_time
 
 # Unversioned presentation entry-point
 /subdir/
-  Cache-Control: max-age=$cache_time, immutable
+  Cache-Control: max-age=$cache_time
 
 EOF
 fi
@@ -151,6 +151,7 @@ fi
 #
 sed --in-place '
     s/_CACHE_POLICY_/'"$cache_policy"'/;
+    s/_ENTRY_CACHE_TIME_/'"$cache_time"'/;
     s/_HOTFIX_TILL_/'"$hotfix_till"'/;
     s/_MAINTENANCE_TILL_/'"$maintenance_till"'/;
     s/_HOTFIX_CACHE_TIME_/'"$hotfix_cache_time_desc"'/;
