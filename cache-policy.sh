@@ -80,8 +80,8 @@ else
                     elif (( time_since_last_deployment < maintenance_period )) ; then
                         cache_state=101
                         cache_time=$maintenance_cache_time
-                        hotfix_till="ended"
-                        maintenance_till=$(date -d "+$maintenance_period_desc -$time_since_last_deployment seconds")
+                        hotfix_after="ended"
+                        maintenance_after=$(date -d "+$maintenance_period_desc -$time_since_last_deployment seconds")
                         cache_policy="Maintenance-ready"
                     fi
                     ;;
@@ -92,24 +92,44 @@ else
 fi
 
 # ############# Prepare feedback for demo page ############################
+# The last_deployment calculation is not correct because it samples current time,
+# which can be off compared to the sample taken in unbust.sh.
+# The difference can be a second or more depending on the time it take unbust.sh
+# to fetch and populate deprecated assets.
+#
+# I could fix it by making the 2nd argument an absolute time, but that would
+# make the interface less elegant.
+#
+# I'm keeping the interface elegant, and live with a few seconds of discrepancy
+# in the demo.
+#
+# If this bothers you in your own application, feel free to change it in your
+# fork.
+# #####################################################
 case $cache_state in
     100)
             cache_time=$hotfix_cache_time
-            hotfix_till=$(date -d "+$hotfix_period_desc -$time_since_last_deployment seconds")
-            maintenance_till=$(date -d "+$maintenance_period_desc +$hotfix_period_desc -$time_since_last_deployment seconds")
+            hotfix_after=$(date)
+            maintenance_after=$(date -d "+$hotfix_period_desc")
+            stable_after="not before $(date -d "+$hotfix_period_desc +$maintenance_period_desc")"
             cache_policy="Hotfix-ready"
+            last_deployment=$(date)
             ;;
     101)
             cache_time=$maintenance_cache_time
-            hotfix_till="ended"
-            maintenance_till=$(date -d "+$maintenance_period_desc -$time_since_last_deployment seconds")
+            hotfix_after="ended"
+            maintenance_after=$(date)
+            stable_after=$(date -d "+$maintenance_period_desc")
             cache_policy="Maintenance-ready"
+            last_deployment=$(date -d "-$time_since_last_deployment seconds")
             ;;
     102)
             cache_time=$stable_cache_time
-            hotfix_till="ended"
-            maintenance_till="ended"
+            hotfix_after="ended"
+            maintenance_after="ended"
+            stable_after="now"
             cache_policy="Stable"
+            last_deployment=$(date -d "-$time_since_last_deployment seconds")
             ;;
 esac
 
@@ -152,12 +172,13 @@ fi
 sed --in-place '
     s/_CACHE_POLICY_/'"$cache_policy"'/;
     s/_ENTRY_CACHE_TIME_/'"$cache_time"'/;
-    s/_HOTFIX_TILL_/'"$hotfix_till"'/;
-    s/_MAINTENANCE_TILL_/'"$maintenance_till"'/;
+    s/_HOTFIX_AFTER_/'"$hotfix_after"'/;
+    s/_MAINTENANCE_AFTER_/'"$maintenance_after"'/;
+    s/_STABLE_AFTER_/'"$stable_after"'/;
     s/_HOTFIX_CACHE_TIME_/'"$hotfix_cache_time_desc"'/;
     s/_MAINTENANCE_CACHE_TIME_/'"$maintenance_cache_time_desc"'/;
     s/_STABLE_CACHE_TIME_/'"$stable_cache_time_desc"'/;
-    s/_LAST_DEPLOYMENT_/'"$(date -d "+$time_since_last_deployment seconds")"'/;
+    s/_LAST_DEPLOYMENT_/'"$last_deployment"'/;
     ' $output_dir/index.html
 
 # ############# Return the cache state decision to unbust.sh #############
