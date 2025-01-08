@@ -134,11 +134,11 @@ if [[ "${CF_PAGES}" == 1 ]] ; then
 
 # Unversioned presentation entry-point
 /
-  Cache-Control: max-age=$cache_time
+  Cache-Control: max-age=$cache_time, immutable
 
 # Unversioned presentation entry-point
 /subdir/
-  Cache-Control: max-age=$cache_time
+  Cache-Control: max-age=$cache_time, immutable
 
 EOF
 fi
