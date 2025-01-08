@@ -16,7 +16,7 @@
 # It requires two arguments and two environment variables:
 #
 # Arguments:
-#    unbust.sh <outputdir> <initial commit hash>
+#    unbust.sh <outputdir> <initial commit hash> [cache logic script]
 #       <outputdir> - The directory where the files to be published are
 #                    (the build output directory). It can be relative.
 #       <initial commit hash> - The commit hash in the source repo that is
@@ -24,6 +24,9 @@
 #                    DB, but only if the currently deployed commit matches this
 #                    in order to avoid accidentally reinitializing the DB due
 #                    to misconfiguration or other errors.
+#       [cache logic script] - (optional) A script that takes two arguments and
+#                    returns a caching decision as exit code. See "Cache Logic"
+#                    below.
 #
 # Environment:
 #
@@ -40,6 +43,69 @@
 #                   $PUBLIC_URL/$UNBUST_CACHE_DBNAME, (default=unbust-cache-db)
 #                       eg, "my-unbust-db"
 #
+# Cache logic:
+#
+#       If a "cache logic script" is given as the third argument on the command
+#       line, it will be called before the persisted files are fetched. This
+#       script can be used to generate a _headers configuration containing
+#       "Cache-Control" headers, for example, according to some policy.
+#
+#       The script is called with two arguments:
+#           1. "0" if the currently deployed source commit is the different
+#              than the previous deployment, or "1" if it is a repeat deployment
+#           2. The time in second since the previous deployment.
+#           3. The previous cache policy applied, or "initial" if it's the first
+#              deployment with a cache policy script present. This will be the
+#              same numeric code previously returned by the cache policy script
+#              (ie, 0 or 100-119)
+#
+#       The script should return one of the following exit codes:
+#           0 - All good, no cache policy was applied
+#           1 - Deployment should be aborted
+#           100 - "Hotfix-ready"
+#           101 - "Maintenance-ready"
+#           102 - "Stable"
+#           103-119 - custom
+#
+# The unbust script doesn't do anything with this policy code than store it
+# in the persistence DB, and supply it on the following deployment. It's up to
+# the cache logic script to decide how to use it, or what codes mean.
+#
+# Suggested cache logic (assuming CI/CD implements a cron job to call
+# deployment periodically):
+#
+# When deploying a new source commit (1st arg is "0"), assume the website is
+# broken, and take a "hotfix-ready" stance. The entry-point (index.html, etc)
+# should be minimally cached, possibly 10 minutes or so. All versioned files
+# can use normal (stable) settings. If a hotfix is required, roll the versions
+# of the versioned assets, and overwrite the entry-point.
+#
+# When deploying a repeat commit (1st arg is "1"), depending on how long it's
+# been since the previous deployment, the cache settings can be relaxed.
+# If it's been less than 1 week since the last deployment, abort the repeat
+# deployment by returning 1.
+# After 1 week in "hotfix-ready", switch to "maintenance-ready".
+# There is no emergency, but some undiscovered bugs may still exist.
+# A medium cache time for the entry point is appropriate, possibly 1 day or so,
+# meaning that after a bug has been been fixed and deployed, users of the
+# site may still see the buggy version for up to a day.
+# If the bug fix turns out to break the site, at least it will be unleashed
+# over a 1 day, rather than quickly.
+# After 3 weeks in maintenance-ready, switch to "stable".
+# This is the longest cache times that are appropriate. The "stable" cache time
+# normally depends on when you plan the next release, and how quickly you will
+# expect the rollout to be. Eg, a one month cache time means your users will
+# see the old version for up to a month after the new release is deployed.
+# It also gives you breathing room. If the next release turns out to be
+# a disaster, at least you will dissapoint only 1/30 of your users each day,
+# making the eventual hotfix less urgent. OTOH, a short cache time means if you
+# screw up the next release, everyone will know right away.
+# 
+# The return value of 0 is no different than the 100-119 range. The deployemnt
+# will continue as normal. You could take it to mean "the policy script ran,
+# but made no caching decisions" (ie, the CDN's default caching policy was
+# in force).
+# 
 #
 # The script automatically trims the persistence history as needed to prevent
 # it from growing indefinitely. If you want too keep the full persistence
