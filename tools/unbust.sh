@@ -344,21 +344,27 @@ unset cache_state_msg
 trailers=()
 record_caching_state() {
 	local cache_logic_script=$1
-	local cache_state=0
+	local last_commit_time=$2
+	local cache_state="initial"
 	local same_source_sha=0
 
 	if [[ ${SOURCE_COMMIT_SHA:+isset} ]] ; then
 		while read -r trailer content ; do
 			case ${trailer,,} in
-				souce) if [[ $content == $SOURCE_COMMIT_SHA ]] ; then
+				source)
+					if [[ $content == ${SOURCE_COMMIT_SHA::10} ]] ; then
 								same_source_sha=1
-							  fi
-							;;
+					fi
+					;;
+				cache) cache_state=$content
+					;;
 			esac
-		done <(git show -s --no-decorate | git interpret-trailers --parse --trim-empty)
+		done < <(git show -s --no-decorate | git interpret-trailers --parse --trim-empty)
 	fi
 
-	$cache_logic_script $same_source_sha $time_since_last_commit || cache_state=$?
+	pushd
+	$cache_logic_script $same_source_sha $last_commit_time $cache_state && cache_state=$? || cache_state=$?
+	pushd
 
 	case $cache_state in
 		100) cache_state_msg="Hotfix-ready"
@@ -368,16 +374,28 @@ record_caching_state() {
 		102) cache_state_msg="Stable"
 		;;
 	esac
+set -x
+	if (( cache_state == 0 || (cache_state >= 100 && cache_state < 119) )) ; then
+		if [[ ${cache_state_msg:+isset} ]] ; then
+			trailers+=(--trailer "Cache: $cache_state - ${cache_state_msg}")
+		else
+			trailers+=(--trailer "Cache: ${cache_state}")
+		fi
 
-	if [[ ${cache_state_msg:+isset} ]] ; then
-		trailers+=(--trailer "Cache: ${cache_state_msg}")
 		# if git checkout $cache_branch ; then
 		# 	git merge --no-edit -m "$cache_state_msg" "$publish_branch"
 		# else
 		# 	git checkout -b $cache_branch
 		# 	git commit --allow-empty -m "$cache_state_msg"
 		# fi
+	elif [[ $cache_state == 1 ]] ; then
+		>&2 echo "ERROR: Deployment rejected by cache policy script $cache_logic_script."
+		exit 1
+	else
+		>&2 echo "ERROR: Cache policy script $cache_logic_script failed ($cache_state)."
+		exit 1
 	fi
+set +x
 }
 
 # Implentation choices
@@ -401,22 +419,23 @@ deprecation_track() {
 
 	git add -A files
 
-	local time_since_last_commit
-	if [[ ${cache_logic_script:+isset} ]] && [ -x ${cache_logic_script} ] ; then
-		time_since_last_commit=$(git log -1 --format=%at)
+set -x
+	local last_commit_time
+	if [[ ${cache_logic_script:+isset} ]] ; then
+		last_commit_time=$(git log -1 --format=%at)
 	fi
 
-	if [[ ${time_since_last_commit:+isset} ]] ; then
-		record_caching_state "$cache_logic_script" "$time_since_last_commit"
+	if [[ ${last_commit_time:+isset} ]] ; then
+		record_caching_state "$cache_logic_script" "$((NOW - last_commit_time))"
 	fi
 
 	if [[ ${SOURCE_COMMIT_SHA:+isset} ]] ; then
-		trailers+=(--trailer "Source: $SOURCE_COMMIT_SHA")
+		trailers+=(--trailer "Source: ${SOURCE_COMMIT_SHA::10}")
 	fi
 	if [[ ${#trailers[@]} -gt 0 ]] ; then
 		msg=$(echo "$msg" | git interpret-trailers "${trailers[@]}")
 	fi
-
+set +x
 	git commit -q --allow-empty -m "$msg"
 
 	git gc --quiet
@@ -426,6 +445,7 @@ deprecation_track() {
 
 	deprecation_refill "${dburl}"
 
+	git show -p
 	git checkout -q empty
 
 	# FIXME: Max size 25M, then we have to split
@@ -499,14 +519,22 @@ while getopts ":fh" opt ; do
 	esac
 done
 
-[[ $# -le 2 ]] && {
+[[ $# -lt 2 ]] && {
 	usage
 	exit 1
 }
 
-[ ! -d "$1" ] && {
+[ -d "$1" ] || {
 	>&2 echo "Not a directory: $1"
+	exit 1
 }
+
+if [[ $# -ge 3 ]] ; then
+	type $3 2>/dev/null 2>&1 || {
+		>&2 echo "Cache policy script not found or not executable ($3)"
+		exit 1
+	}
+fi
 
 pushd "$1"
 
