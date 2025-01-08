@@ -14,9 +14,17 @@
 # ########################################################
 
 set -x
+set -o errexit
+
+[[ $# -eq 4 ]] || {
+    echo "Usage: $0 <is_redeployement> <time_since_last_deployment> <last_cache_state> <output_dir>";
+    exit 1;
+}
+
 is_redeployement=$1
 time_since_last_deployment=$2
 last_cache_state=$3
+output_dir=$4
 
 # ############# Policy choices ############################
 hotfix_period=$((3600 * 24 * 7))
@@ -89,7 +97,7 @@ case $cache_state in
             cache_time=$hotfix_cache_time
             hotfix_till=$(date -d "+$hotfix_period_desc -$time_since_last_deployment seconds")
             maintenance_till=$(date -d "+$maintenance_period_desc +$hotfix_period_desc -$time_since_last_deployment seconds")
-            cache_policy="Hootfix-ready"
+            cache_policy="Hotfix-ready"
             ;;
     101)
             cache_time=$maintenance_cache_time
@@ -104,7 +112,34 @@ case $cache_state in
             cache_policy="Stable"
             ;;
 esac
-    
+
+# ############# Set CDN configuration ############################
+if [[ "${CF_PAGES}" == 1 ]] ; then
+  cat >> $output_dir/_headers <<EOF
+
+# Versioned presentation assets
+/*.css
+  Cache-Control: max-age=63072000, immutable
+
+# This is information, must be timely, minimal cache
+/subdir/*.txt
+  Cache-Control: max-age=120
+
+# Unversioned presentation assets
+/subdir/unversioned-file
+  Cache-Control: max-age=31536000, must-revalidate
+
+# Unversioned presentation entry-point
+/
+  Cache-Control: max-age=$cache_time, must-revalidate
+
+# Unversioned presentation entry-point
+/subdir/
+  Cache-Control: max-age=$cache_time, must-revalidate
+
+EOF
+fi
+
 # ############# Update Demo page ############################
 #
 # Instead of updating a page, you might use these variables to notify your team
@@ -119,7 +154,6 @@ sed --in-place '
     s/_MAINTENANCE_CACHE_TIME_/'"$maintenance_cache_time_desc"'/;
     s/_STABLE_CACHE_TIME_/'"$stable_cache_time_desc"'/;
     s/_LAST_DEPLOYMENT_/'"$(date -d "+$time_since_last_deployment seconds")"'/;
-    s/_VERSION_/'v"$version_major"'/;
     ' $output_dir/index.html
 
 # ############# Return the cache state decision to unbust.sh #############

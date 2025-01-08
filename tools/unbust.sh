@@ -50,7 +50,7 @@
 #       script can be used to generate a _headers configuration containing
 #       "Cache-Control" headers, for example, according to some policy.
 #
-#       The script is called with two arguments:
+#       The script is called with four arguments:
 #           1. "0" if the currently deployed source commit is the different
 #              than the previous deployment, or "1" if it is a repeat deployment
 #           2. The time in second since the previous deployment.
@@ -58,6 +58,7 @@
 #              deployment with a cache policy script present. This will be the
 #              same numeric code previously returned by the cache policy script
 #              (ie, 0 or 100-119)
+#           4. output directory
 #
 #       The script should return one of the following exit codes:
 #           0 - All good, no cache policy was applied
@@ -345,15 +346,16 @@ trailers=()
 record_caching_state() {
 	local cache_logic_script=$1
 	local last_commit_time=$2
+	local outdir=$3
 	local cache_state="initial"
-	local same_source_sha=0
+	local is_redeployement=0
 
 	if [[ ${SOURCE_COMMIT_SHA:+isset} ]] ; then
 		while read -r trailer content unused ; do
 			case ${trailer,,} in
 				source)
 					if [[ $content == ${SOURCE_COMMIT_SHA::10} ]] ; then
-								same_source_sha=1
+								is_redeployement=1
 					fi
 					;;
 				cache) cache_state=$content
@@ -363,7 +365,7 @@ record_caching_state() {
 	fi
 
 	pushd
-	$cache_logic_script $same_source_sha $last_commit_time $cache_state && cache_state=$? || cache_state=$?
+	$cache_logic_script $is_redeployement $last_commit_time $cache_state "$outdir" && cache_state=$? || cache_state=$?
 	pushd
 
 	case $cache_state in
@@ -389,7 +391,7 @@ record_caching_state() {
 		# 	git commit --allow-empty -m "$cache_state_msg"
 		# fi
 	elif [[ $cache_state == 1 ]] ; then
-		>&2 echo "ERROR: Deployment rejected by cache policy script \"$cache_logic_script $same_source_sha $last_commit_time $cache_state\"."
+		>&2 echo "ERROR: Deployment rejected by cache policy script \"$cache_logic_script $is_redeployement $last_commit_time $cache_state\"."
 		exit 1
 	else
 		>&2 echo "ERROR: Cache policy script $cache_logic_script failed ($cache_state)."
@@ -407,6 +409,7 @@ deprecation_track() {
 	local dburl="$1"
 	local msg="${2:-Published $(sitestats)}"
 	local cache_logic_script=$3
+	local outdir=$4
 
 	# Implentation choices
 	local remotename=public
@@ -425,7 +428,7 @@ deprecation_track() {
 	fi
 
 	if [[ ${last_commit_time:+isset} ]] ; then
-		record_caching_state "$cache_logic_script" "$((NOW - last_commit_time))"
+		record_caching_state "$cache_logic_script" "$((NOW - last_commit_time))" "$outdir"
 	fi
 
 	if [[ ${SOURCE_COMMIT_SHA:+isset} ]] ; then
@@ -541,4 +544,4 @@ INITIAL_COMMIT_SHA="$2"
 
 CDN_set_vars
 
-deprecation_track "$PUBLIC_URL" "$DEPRECATION_MESSAGE" "${3:-}"
+deprecation_track "$PUBLIC_URL" "$DEPRECATION_MESSAGE" "${3:-}" "$1"

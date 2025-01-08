@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="_STYLES_FILE_">
 </head>
 <body>
-    <h1>Unbust demo (release <span class="code">_VERSION_</span>)</h1>
+    <h1>Unbust demo (release <span class="code">_VERSION_</span>, cache policy <span class="code">_CACHE_POLICY_</span>)</h1>
     <div class="text-box">
         This demo of <a href="http://github.com/Archivium/unbust">Archivium cache unbust</a> is re-deployed on a cron job on the 3rd of every month, with <span class="code">UNBUST_CACHE_TIME</span> set to "6 months ago"
         <ul>
@@ -32,5 +32,28 @@
     <div class="iframe-container">
         <iframe src="subdir/all-files.txt" frameborder="0"></iframe>
     </div>
+    <h2>Cache policies (last deployment: _LAST_DEPLOYMENT_):</h2>
+    <table>
+        <tr>
+          <th>Policy</th>
+          <th>In effect after</th>
+          <th>entry-point cache time</th>
+        </tr>
+        <tr>
+          <td>Hotfix-ready</td>
+          <td>_HOTFIX_TILL_</td>
+          <td>_HOTFIX_CACHE_TIME_</td>
+        </tr>
+        <tr>
+          <td>Maintenance-ready</td>
+          <td>_MAINTENANCE_TILL_</td>
+          <td>_MAINTENANCE_CACHE_TIME_</td>
+        </tr>
+        <tr>
+          <td>Stable</td>
+          <td>-</td>
+          <td>_STABLE_CACHE_TIME_</td>
+        </tr>
+      </table>
 </body>
 </html>
