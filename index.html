@@ -24,19 +24,19 @@
             <li>Github Pages: <a href="//unbust.github.io">https://unbust.github.io</a></li>
         </ul>
     </div>
-    <h2>Generated files:</h2>
+    <h2>Generated files (UTC times):</h2>
     <div class="iframe-container">
         <iframe src="subdir/generated.txt" frameborder="0"></iframe>
     </div>
-    <h2>Full file list (generated + persisted):</h2>
+    <h2>Full file list (generated + persisted, UTC times):</h2>
     <div class="iframe-container">
         <iframe src="subdir/all-files.txt" frameborder="0"></iframe>
     </div>
-    <h2>Cache policies (last deployment: _LAST_DEPLOYMENT_):</h2>
+    <h2>Cache policies (<span class="localtz"></span> - last deployment: _LAST_DEPLOYMENT_):</h2>
     <table>
         <tr>
           <th>Policy</th>
-          <th>In effect until</th>
+          <th>In effect after</th>
           <th>entry-point cache time</th>
         </tr>
         <tr>
@@ -55,5 +55,22 @@
           <td>_STABLE_CACHE_TIME_</td>
         </tr>
       </table>
-</body>
+      <script>
+		const utcDateElements = document.querySelectorAll('.udate');
+
+		utcDateElements.forEach((element) => {
+			const utcDate = new Date(element.innerText);
+			const localDate = utcDate.toLocaleString();
+			element.innerText = localDate;
+		});
+
+        const localTzElements = document.querySelectorAll('.localtz');
+
+        // Get the local timezone name
+		const localTzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        localTzElements.forEach((element) => {
+            element.innerText = localTzName;
+        });
+	</script></body>
 </html>

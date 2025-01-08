@@ -48,10 +48,11 @@ sed '
 
 cp $output_dir/styles.v"$version_major".css $output_dir/subdir
 cp favicon.ico $output_dir
+cp dates.html $output_dir
 echo "This unversioned file was last generated on $(date) (with v$version_major release)"> $output_dir/subdir/unversioned-file
 # cp styles.css $output_dir/styles.v"$version_major".css
 
-echo "Updated" > $output_dir/Updated-$FN
+echo "Generated" > $output_dir/Generated-$FN
 
 # Turn off SPA mode in the subdirectory
 echo "File Not Found (404)" > $output_dir/subdir/404.html

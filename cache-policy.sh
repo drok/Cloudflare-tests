@@ -47,8 +47,9 @@ stable_cache_time_desc="1 month"
 # Github's cron job triggers every day at 2 AM UTC
 # If you use this demo policy as template, you'd want to "exit 1" unconditionally here.
 # #####################################################
-NOW=$(date -u +%d%H%M)
-if [[ ${NOW::5} == "03020" ]] ; then
+NOW=$(date --iso=seconds)
+mohour=$(date -d "$NOW" -u +%d%H%M)
+if [[ ${mohour::5} == "03020" ]] ; then
     is_redeployement=0
 fi
 
@@ -106,22 +107,27 @@ fi
 # If this bothers you in your own application, feel free to change it in your
 # fork.
 # #####################################################
+function date() {
+    local datestr
+    datestr=$(command date "$@")
+    echo "<span class="udate">$datestr</span>"
+}
 case $cache_state in
     100)
             cache_time=$hotfix_cache_time
-            hotfix_after=$(date)
-            maintenance_after=$(date -d "+$hotfix_period_desc")
-            stable_after="not before $(date -d "+$hotfix_period_desc +$maintenance_period_desc")"
+            hotfix_after=$(date -d "$NOW")
+            maintenance_after=$(date -d "$NOW +$hotfix_period_desc")
+            stable_after="not before $(date -d "$NOW +$hotfix_period_desc +$maintenance_period_desc")"
             cache_policy="Hotfix-ready"
-            last_deployment=$(date)
+            last_deployment=$(date -d "$NOW")
             ;;
     101)
             cache_time=$maintenance_cache_time
             hotfix_after="ended"
-            maintenance_after=$(date)
-            stable_after=$(date -d "+$maintenance_period_desc")
+            maintenance_after=$(date -d "$NOW")
+            stable_after=$(date -d "$NOW +$maintenance_period_desc")
             cache_policy="Maintenance-ready"
-            last_deployment=$(date -d "-$time_since_last_deployment seconds")
+            last_deployment=$(date -d "$NOW -$time_since_last_deployment seconds")
             ;;
     102)
             cache_time=$stable_cache_time
@@ -129,7 +135,7 @@ case $cache_state in
             maintenance_after="ended"
             stable_after="now"
             cache_policy="Stable"
-            last_deployment=$(date -d "-$time_since_last_deployment seconds")
+            last_deployment=$(date -d "$NOW -$time_since_last_deployment seconds")
             ;;
 esac
 
@@ -170,15 +176,15 @@ fi
 # ie, email/slack/calendar/etc.
 #
 sed --in-place '
-    s/_CACHE_POLICY_/'"$cache_policy"'/;
-    s/_ENTRY_CACHE_TIME_/'"$cache_time"'/;
-    s/_HOTFIX_AFTER_/'"$hotfix_after"'/;
-    s/_MAINTENANCE_AFTER_/'"$maintenance_after"'/;
-    s/_STABLE_AFTER_/'"$stable_after"'/;
-    s/_HOTFIX_CACHE_TIME_/'"$hotfix_cache_time_desc"'/;
-    s/_MAINTENANCE_CACHE_TIME_/'"$maintenance_cache_time_desc"'/;
-    s/_STABLE_CACHE_TIME_/'"$stable_cache_time_desc"'/;
-    s/_LAST_DEPLOYMENT_/'"$last_deployment"'/;
+    s@_CACHE_POLICY_@'"$cache_policy"'@;
+    s@_ENTRY_CACHE_TIME_@'"$cache_time"'@;
+    s@_HOTFIX_AFTER_@'"$hotfix_after"'@;
+    s@_MAINTENANCE_AFTER_@'"$maintenance_after"'@;
+    s@_STABLE_AFTER_@'"$stable_after"'@;
+    s@_HOTFIX_CACHE_TIME_@'"$hotfix_cache_time_desc"'@;
+    s@_MAINTENANCE_CACHE_TIME_@'"$maintenance_cache_time_desc"'@;
+    s@_STABLE_CACHE_TIME_@'"$stable_cache_time_desc"'@;
+    s@_LAST_DEPLOYMENT_@'"$last_deployment"'@;
     ' $output_dir/index.html
 
 # ############# Return the cache state decision to unbust.sh #############

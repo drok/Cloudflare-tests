@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>UTC to Local Timezone Converter</title>
+</head>
+<body>
+	<h1>UTC to Local Timezone Converter</h1>
+	<input id="utc-date" type="text" placeholder="Enter UTC date (YYYY-MM-DDTHH:MM:SSZ)">
+	<button id="convert-button">Convert to Local Timezone</button>
+	<p id="local-date"></p>
+
+	<script>
+		const utcDateInput = document.getElementById('utc-date');
+		const convertButton = document.getElementById('convert-button');
+		const localDateElement = document.getElementById('local-date');
+
+		convertButton.addEventListener('click', () => {
+			const utcDate = new Date(utcDateInput.value);
+			const localDate = utcDate.toLocaleString();
+			localDateElement.innerText = `Local Date: ${localDate}`;
+		});
+	</script>
+</body>
+</html>
+
