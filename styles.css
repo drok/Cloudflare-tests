@@ -94,3 +94,23 @@ td {
     border-bottom: 1px solid #dddddd;
     padding: 8px;
 }
+
+.swatch-box {
+    white-space: nowrap;
+}
+.swatch {
+    width: 50px;
+    height: 50px;
+    border: 1px solid darkgray;
+    border-radius: 5px;
+    display: inline-block;
+    text-align: center;
+    padding-top: 20px;
+}
+.active-swatch {
+    border: 2px solid black;
+       display: inline-block;
+    width: 55px;
+    height: 55px;
+    margin: 2px;
+}

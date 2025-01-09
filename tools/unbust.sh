@@ -53,7 +53,7 @@
 #       The script is called with four arguments:
 #           1. "0" if the currently deployed source commit is the different
 #              than the previous deployment, or "1" if it is a repeat deployment
-#           2. The time in second since the previous deployment.
+#           2. The time in seconds since the previous successful deployment.
 #           3. The previous cache policy applied, or "initial" if it's the first
 #              deployment with a cache policy script present. This will be the
 #              same numeric code previously returned by the cache policy script

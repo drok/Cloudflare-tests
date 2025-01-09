@@ -280,6 +280,7 @@ sed --in-place '
     s@_LAST_DEPLOYMENT_@'"$last_deployment"'@;
     s@_POLICY_TABLE_CLASS_@'"$policy_table_class"'@;
     s@_POLICY_IMPOSSIBLE_CLASS_@'"$policy_impossible_class"'@;
+    s@_UNBUST_CACHE_TIME_@'"$UNBUST_CACHE_TIME"'@;
     ' $output_dir/index.html
 
 # ############# Return the cache state decision to unbust.sh #############

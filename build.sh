@@ -35,9 +35,25 @@ pastel_colors=(
 # Create versioned assets
 deterministic_version
 
+# Generate color swatch
+generate_color_swatch() {
+    COLOR_SWATCH_BOX=""
+    for i in "${!pastel_colors[@]}"; do
+        local color=${colors[$i]}
+        if (( i == version_major % ${#pastel_colors[@]} )); then
+            class="swatch active"
+        else
+            class="swatch"
+        fi
+        COLOR_SWATCH_BOX+="<div class="$class" style='background-color: $color;'><b>$i</b></div>\n"
+    done
+}
+generate_color_swatch
+
 sed '
     s/_STYLES_FILE_/'styles.v"$version_major".css'/;
     s/_VERSION_/'v"$version_major"'/;
+    s/_SWATCH_BOX_/'"$COLOR_SWATCH_BOX"'/;
     ' <index.html > $output_dir/index.html
 
 sed '
@@ -56,7 +72,6 @@ echo "Generated" > $output_dir/Generated-$FN
 echo "File Not Found (404)" > $output_dir/subdir/404.html
 
 # Generate file listing
-
 cat >$output_dir/subdir/index.html <<!
 <!DOCTYPE html>
 <html>
