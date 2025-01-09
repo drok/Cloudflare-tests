@@ -132,11 +132,6 @@ error=0
 	error=1
 }
 
-[[ ${PUBLIC_URL:+isset} ]] || {
-	>&2 echo "ERROR: PUBLIC_URL is not set."
-	error=1
-}
-
 # Optional control variables:
 [[ ${UNBUST_CACHE_DBNAME:+isset} ]] || {
 	UNBUST_CACHE_DBNAME=unbust-cache-db
@@ -164,25 +159,45 @@ set -o pipefail
 #                         a simple git repo tar.bz2 and encrypted), this can
 #                         help with debugging.
 # - SOURCE_COMMIT_SHA   - The commit hash of the source repo that is deployed
-# - DEPLOYED_AT_URL		- The URL of the deployed site
+# - DEPLOYED_AT_URL		- The URL of the deployed site for this commit
+# - PUBLIC_URL          - The URL where the branch is deployed
+#                         Note: For Cloudflare, this must be set in the
+#						  calling environment. It cannot be detected
 CDN_set_vars()  {
 
 	# Cloudflare Pages
 	if [[ ${CF_PAGES:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${CF_PAGES_BRANCH}"
 		SOURCE_COMMIT_SHA=$CF_PAGES_COMMIT_SHA
-		DEPLOYED_AT_URL=$CF_PAGES_URL
+		DEPLOYED_AT_URL=$CF_PAGES_URL # This is a deployment-unique url
 
 	# GitHub Pages
 	elif [[ ${GITHUB_ACTIONS:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${GITHUB_REF}"
 		SOURCE_COMMIT_SHA=$GITHUB_SHA
+		PUBLIC_URL=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.html_url')
 		DEPLOYED_AT_URL=$PUBLIC_URL
+	
+	# Netlify
+	elif [[ ${NETLIFY:+isset} ]] ; then
+		DEPRECATION_MESSAGE="Published $(sitestats) from ${BRANCH}"
+		SOURCE_COMMIT_SHA=$COMMIT_REF
+		PUBLIC_URL=$DEPLOY_PRIME_URL
+		DEPLOYED_AT_URL=$DEPLOY_URL
 	else
 		>&2 echo "ERROR: This CDN is not yet supported."
 		return 1
 		DEPRECATION_MESSAGE="Published $(sitestats)"
 	fi
+
+	# Check that after CDN, a PUBLIC_URL is found. Some CDNs (Cloudflare Pages)
+	# need this specified as environment variable.
+	# Most autodetect it (Github, Netlify)
+	[[ ${PUBLIC_URL:+isset} ]] || {
+		>&2 echo "ERROR: PUBLIC_URL is not set."
+		error=1
+	}
+
 }
 # ################ End of CDN support hooks #####################
 

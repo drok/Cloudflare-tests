@@ -40,19 +40,12 @@ jobs:
         id: build
         run: ./build.sh
 
-      - name: Fetch PUBLIC_URL from api
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          url=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.html_url')
-          echo "PUBLIC_URL=$url" >> $GITHUB_ENV
-
       - name: Unbust Cache
         env:
           UNBUST_CACHE_KEY: ${{ secrets.UNBUST_CACHE_KEY }}
           UNBUST_CACHE_DBNAME: ${{ vars.UNBUST_CACHE_DBNAME }}
           UNBUST_CACHE_TIME: ${{ vars.UNBUST_CACHE_TIME }}
-        run: bash -x tools/unbust.sh out ${{ vars.UNBUST_CACHE_START_COMMIT }} ./cache-policy.sh
+        run: tools/unbust.sh out ${{ vars.UNBUST_CACHE_START_COMMIT }} ./cache-policy.sh
 
       - name: Generate all-files list
         run: find out -type f -ls | sort -n > out/subdir/all-files.txt

@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -x
-
 NOW=$(date +%s)
 date() {
 	command date --date=@$NOW "$@"

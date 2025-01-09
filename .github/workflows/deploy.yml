@@ -2,8 +2,7 @@ name: Deploy to Cloudflare Pages
 
 on:
   schedule:
-    - cron: "*/15 * * * *"  # Every 15 minutes
-    - cron: "0 7 * * *"  # Every 3rd of every month at 2AM EST is 07:00 UTC
+    - cron: "0 2 * * 2"  # Every Tuesday at 02:00 UTC
 jobs:
   deploy:
     runs-on: ubuntu-latest

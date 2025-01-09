@@ -194,11 +194,53 @@ if [[ "${CF_PAGES:-no}" == 1 ]] ; then
   Cache-Control: max-age=$cache_time
 
 EOF
+
 elif [[ "${GITHUB_ACTIONS:-no}" == true ]] ; then
     cache_policy="cache management not-supported on GitHub Pages"
     sed --in-place '
         s@cache-policy-container@cache-policy-container hidden@;
     ' $output_dir/index.html
+
+elif [[ "${NETLIFY:-no}" == true ]] ; then
+  cat >> $output_dir/netlify.toml <<EOF
+
+# Versioned presentation assets
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+  Cache-Control: max-age=63072000, immutable
+
+[[headers]]
+  for = /favicon.ico
+  [headers.values]
+  Cache-Control: max-age=63072000, immutable
+
+# This is information, must be timely, minimal cache
+[[headers]]
+  for = /subdir/*.txt
+  [headers.values]
+  Cache-Control: max-age=120
+
+# Unversioned presentation assets
+[[headers]]
+  for = /subdir/unversioned-file
+  [headers.values]
+  Cache-Control: max-age=31536000, must-revalidate
+
+# Unversioned presentation entry-point
+[[headers]]
+  for = /
+  [headers.values]
+  Cache-Control: max-age=$cache_time
+
+# Unversioned presentation entry-point
+[[headers]]
+  for = /subdir/
+  [headers.values]
+  Cache-Control: max-age=$cache_time
+
+EOF
+
 fi
 
 # ############# Update Demo page ############################
