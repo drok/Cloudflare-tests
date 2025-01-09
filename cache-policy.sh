@@ -76,7 +76,11 @@ else
         102)        exit 1 # stay stable.
                     ;;
         initial|*)  # Cover the case where the previous commit's cache policy implemented different states
-                    if (( time_since_last_deployment < hotfix_period )) ; then
+                    if [[ "${GITHUB_ACTIONS:-no}" == true ]] ; then
+                        # Just allow the build, GitHub Pages are not rebuilt on cron
+                        # because setting headers is not supported; policy can't work.
+                        cache_state=0
+                    elif (( time_since_last_deployment < hotfix_period )) ; then
                         cache_state=100
                     elif (( time_since_last_deployment < maintenance_period )) ; then
                         cache_state=101
@@ -137,10 +141,28 @@ case $cache_state in
             cache_policy="Stable"
             last_deployment=$(date -d "$NOW -$time_since_last_deployment seconds")
             ;;
+    0)
+            cache_time="GitHub Pages defaults"
+            hotfix_after="n/a"
+            maintenance_after="n/a"
+            stable_after="n/a"
+            cache_policy="n/a"
+            last_deployment=$(date -d "$NOW")
+            ;;
 esac
 
+case $cache_state in
+    0)
+            policy_table_class="cache-policy-unsupported"
+            policy_impossible_class="cache-policy-container"
+            ;;
+    *)
+            policy_table_class="cache-policy-container"
+            policy_impossible_class="cache-policy-unsuported"
+    ;;
+esac
 # ############# Set CDN configuration ############################
-if [[ "${CF_PAGES}" == 1 ]] ; then
+if [[ "${CF_PAGES:-no}" == 1]] ; then
   cat >> $output_dir/_headers <<EOF
 
 # Versioned presentation assets
@@ -167,6 +189,11 @@ if [[ "${CF_PAGES}" == 1 ]] ; then
   Cache-Control: max-age=$cache_time
 
 EOF
+elif [[ "${GITHUB_ACTIONS:-no}" == true ]] ; then
+    cache_policy="cache management not-supported on GitHub Pages"
+    sed --in-place '
+        s@cache-policy-container@cache-policy-container hidden@;
+    ' $output_dir/index.html
 fi
 
 # ############# Update Demo page ############################
@@ -185,6 +212,8 @@ sed --in-place '
     s@_MAINTENANCE_CACHE_TIME_@'"$maintenance_cache_time_desc"'@;
     s@_STABLE_CACHE_TIME_@'"$stable_cache_time_desc"'@;
     s@_LAST_DEPLOYMENT_@'"$last_deployment"'@;
+    s@_POLICY_TABLE_CLASS_@'"$policy_table_class"'@;
+    s@_POLICY_IMPOSSIBLE_CLASS_@'"$policy_impossible_class"'@;
     ' $output_dir/index.html
 
 # ############# Return the cache state decision to unbust.sh #############

@@ -48,6 +48,19 @@ h2 {
     border-radius: 10px;
 }
 
+.cache-policy-container {
+    width: 840px;
+    margin: 40px auto;
+    background-color: #F7F7F7; /* light gray */
+    padding: 10px;
+    border: 2px solid #CCCCCC;
+    border-radius: 10px;
+}
+
+.cache-policy-unsupported {
+    display: none;
+}
+
 .code {
     font-family: monospace;
     background-color: #f7f7f7; /* light gray background */

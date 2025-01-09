@@ -166,11 +166,18 @@ set -o pipefail
 # - SOURCE_COMMIT_SHA   - The commit hash of the source repo that is deployed
 # - DEPLOYED_AT_URL		- The URL of the deployed site
 CDN_set_vars()  {
+
 	# Cloudflare Pages
-	if [ ${CF_PAGES:+isset} ] ; then
+	if [[ ${CF_PAGES:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${CF_PAGES_BRANCH}"
 		SOURCE_COMMIT_SHA=$CF_PAGES_COMMIT_SHA
 		DEPLOYED_AT_URL=$CF_PAGES_URL
+
+	# GitHub Pages
+	elif [[ ${GITHUB_ACTIONS:+isset} ]] ; then
+		DEPRECATION_MESSAGE="Published $(sitestats) from ${GITHUB_REF}"
+		SOURCE_COMMIT_SHA=$GITHUB_SHA
+		DEPLOYED_AT_URL=$PUBLIC_URL
 	else
 		>&2 echo "ERROR: This CDN is not yet supported."
 		return 1
@@ -532,7 +539,7 @@ done
 }
 
 if [[ $# -ge 3 ]] ; then
-	type $3 2>/dev/null 2>&1 || {
+	type $3 >/dev/null 2>&1 || {
 		>&2 echo "Cache policy script not found or not executable ($3)"
 		exit 1
 	}

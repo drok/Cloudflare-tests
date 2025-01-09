@@ -33,6 +33,7 @@
         <iframe src="subdir/all-files.txt" frameborder="0"></iframe>
     </div>
     <h2>Cache policies (<span class="localtz"></span> - last deployment: _LAST_DEPLOYMENT_):</h2>
+    <div class="_POLICY_TABLE_CLASS_">
     <table>
         <tr>
           <th>Policy</th>
@@ -55,7 +56,11 @@
           <td>_STABLE_CACHE_TIME_</td>
         </tr>
       </table>
-      <script>
+    </div>
+    <div class="_POLICY_IMPOSSIBLE_CLASS_">
+        <p>This deployment environment does not support setting headers. Cache policy not possible.</p>
+    </div>
+        <script>
 		const utcDateElements = document.querySelectorAll('.udate');
 
 		utcDateElements.forEach((element) => {
