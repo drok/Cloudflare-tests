@@ -13,7 +13,6 @@
 # setting calendar reminders of when the hotfix and maintenance windows close.
 # ########################################################
 
-set -x
 set -o errexit
 
 [[ $# -eq 4 ]] || {

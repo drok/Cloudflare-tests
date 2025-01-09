@@ -269,6 +269,8 @@ deprecation_setup() {
 # deprecated
 deprecation_refill() {
 	local dburl="$1"
+	# Get the path depth of the PUBLIC_URL, so wget can --cut-dirs
+	local urldepth=$(python3 -c 'import os, urllib.parse; from pathlib import Path; print(len(Path(urllib.parse.urlparse(os.getenv("dburl")).path.strip("/")).parents))')
 	local obs=${UNBUST_CACHE_TIME:-$DEFAULT_UNBUST_CACHE_TIME} obstime
 
 	if ! obstime=$(date --date="$obs" "+%s") ; then
@@ -278,7 +280,9 @@ deprecation_refill() {
 	# Trim DB to only the relevant history. This ensures that increasing the UNBUST_CACHE_TIME does
 	# not result in errors due to already missing files.
 	# It also keeps the size of the DB from growing
-	git pull --shallow-since=${obstime} .
+	# Failing is allowed because when UNBUST_CACHE_TIME is increased, it's an
+	# attempt to look further into the history than the graft.
+	git pull --shallow-since=${obstime} . || :
 
 	local num_deprecated_commits=$(git rev-list --topo-order --skip=1 --since=${obstime} --count HEAD)
 
@@ -322,9 +326,8 @@ deprecation_refill() {
 			# Failing to preserve deprecated files is a failure. This script
 			# has ONE JOB, and that is it.
 			#
-			# FIXME: If through some mapping, the deployed files appear in a subdirectory,
-			# need to cut some directories
-			if ! wget --retry-connrefused --recursive --no-host-directories --input-file=$list --base="$dburl" -o "$wgetlog" ; then
+
+			if ! wget --cut-dirs=$urldepth--retry-connrefused --recursive --no-host-directories --input-file=$list --base="$dburl" -o "$wgetlog" ; then
 				echo "# ##########################################################"
 				echo "# #######  Failed to download deprecated files: ############"
 				echo "# ##########################################################"
@@ -404,7 +407,6 @@ record_caching_state() {
 		>&2 echo "ERROR: Cache policy script $cache_logic_script failed ($cache_state)."
 		exit 1
 	fi
-set +x
 }
 
 # Implentation choices
