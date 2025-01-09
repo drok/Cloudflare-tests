@@ -1,3 +1,7 @@
+[![Netlify Status](https://api.netlify.com/api/v1/badges/d360c50c-a150-4328-9cb2-7ed857427267/deploy-status)](https://app.netlify.com/sites/drok-unbust/deploys)
+![GitHub Pages Deploy](https://github.com/github/docs/actions/workflows/deploy-gh-pages.yml/badge.svg)
+![Vercel](https://vercelbadge.vercel.app/api/drok/unbust)
+
 # Unbust Cache Tool
 
 ## The Problem with Cache Busting

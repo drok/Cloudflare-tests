@@ -12,7 +12,7 @@
 # as a template. Or, you may do something else, like email your team or
 # setting calendar reminders of when the hotfix and maintenance windows close.
 # ########################################################
-
+set -x
 set -o errexit
 
 [[ $# -eq 4 ]] || {
@@ -162,7 +162,7 @@ case $cache_state in
             ;;
     *)
             policy_table_class="cache-policy-container"
-            policy_impossible_class="cache-policy-unsuported"
+            policy_impossible_class="cache-policy-unsupported"
     ;;
 esac
 
@@ -239,6 +239,25 @@ elif [[ "${NETLIFY:-no}" == true ]] ; then
   [headers.values]
   Cache-Control: max-age=$cache_time
 
+EOF
+elif [[ "${VERCEL:-no}" == 1 ]] ; then
+  cat >> vercel.json <<EOF
+{
+  "headers": [
+    { "source": "/*.css",
+      "headers": [{ "key": "Cache-Control", "value": "max-age=63072000, immutable" }]},
+    { "source": "/favicon.ico",
+      "headers": [{ "key": "Cache-Control", "value": "max-age=63072000, immutable" }]},
+    { "source": "/subdir/*.txt",
+      "headers": [{ "key": "Cache-Control", "value": "max-age=120" }]},
+    { "source": "/subdir/unversioned-file",
+      "headers": [{ "key": "Cache-Control", "value": "max-age=31536000, must-revalidate" }]},
+    { "source": "/",
+      "headers": [{ "key": "Cache-Control", "value": "max-age=$cache_time" }]},
+    { "source": "/subdir/",
+      "headers": [{ "key": "Cache-Control", "value": "max-age=$cache_time" }]}
+  ]
+}
 EOF
 
 fi

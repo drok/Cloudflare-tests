@@ -184,6 +184,13 @@ CDN_set_vars()  {
 		SOURCE_COMMIT_SHA=$COMMIT_REF
 		PUBLIC_URL=$DEPLOY_PRIME_URL
 		DEPLOYED_AT_URL=$DEPLOY_URL
+
+	# Vercel
+	elif [[ ${VERCEL:+isset} ]] ; then
+		DEPRECATION_MESSAGE="Published $(sitestats) from ${VERCEL_GIT_COMMIT_REF}"
+		SOURCE_COMMIT_SHA=$VERCEL_GIT_COMMIT_SHA
+		PUBLIC_URL=https://$VERCEL_BRANCH_URL
+		DEPLOYED_AT_URL=$PUBLIC_URL
 	else
 		>&2 echo "ERROR: This CDN is not yet supported."
 		return 1
@@ -285,7 +292,7 @@ deprecation_setup() {
 deprecation_refill() {
 	local dburl="$1"
 	# Get the path depth of the PUBLIC_URL, so wget can --cut-dirs
-	local urldepth=$(python3 -c 'import os, urllib.parse; from pathlib import Path; print(len(Path(urllib.parse.urlparse(os.getenv("dburl")).path.strip("/")).parents))')
+	local urldepth=$(python3 -c "import os, urllib.parse; from pathlib import Path; print(len(Path(urllib.parse.urlparse(\"$dburl\").path.strip(\"/\")).parents))")
 	local obs=${UNBUST_CACHE_TIME:-$DEFAULT_UNBUST_CACHE_TIME} obstime
 
 	if ! obstime=$(date --date="$obs" "+%s") ; then
