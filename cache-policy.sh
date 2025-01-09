@@ -161,8 +161,9 @@ case $cache_state in
             policy_impossible_class="cache-policy-unsuported"
     ;;
 esac
+
 # ############# Set CDN configuration ############################
-if [[ "${CF_PAGES:-no}" == 1]] ; then
+if [[ "${CF_PAGES:-no}" == 1 ]] ; then
   cat >> $output_dir/_headers <<EOF
 
 # Versioned presentation assets
