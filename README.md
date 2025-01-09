@@ -61,13 +61,13 @@ The script maintains an encrypted git repository containing records of all deplo
 
 Required environment variables:
 
-  * UNBUST_CACHE_KEY: Secret key for encrypting the persistence database
-  * PUBLIC_URL: The URL where your site is published (only required at Cloudflare, it is ignored and retrieved from the system build environment variables at build time)
+  * `UNBUST_CACHE_KEY`: Secret key for encrypting the persistence database
+  * `PUBLIC_URL`: The URL where your site is published (only required at Cloudflare, it is ignored and retrieved from the system build environment variables at build time)
 
 Optional settings:
 
-  * UNBUST_CACHE_TIME: How long to keep old files (default: `3 months ago`)
-  * UNBUST_CACHE_DBNAME: Name of the encrypted persistence database file (default: `my-unbust-db`)
+  * `UNBUST_CACHE_TIME`: How long to keep old files (default: `3 months ago`)
+  * `UNBUST_CACHE_DBNAME`: Name of the encrypted persistence database file (default: `my-unbust-db`)
 
 Implementing a cache policy is optional, by providing the `cache-policy-script` argument, which can be any script or excutable, which is run with state arguments. See below for CDN supporting custom "`Cache-Control`" headers. This implemented with BUILD_HOOKS running on a cron schedule to trigger re-deployment. The cache-policy script calculates the cache terms, or rejects the deployment if no change is needed.
 
@@ -105,11 +105,26 @@ Some CDNs do not support custom "`Cache-Control`" headers. In that case, setting
 
 ## Installation
 
-The easiest way to install `unbust.sh` in your project is to merge the [unbust/main](/Archivium/unbust) branch into your project. Reject the `README.md` file (if it changes in the future, you'll get a merge conflict prompting you to remove the changes to the documentation).
+The easiest way to install `unbust.sh` in your project is to merge the `[unbust/main](/Archivium/unbust)` branch into your project. Reject the `README.md` file (if it changes in the future, you'll get a merge conflict prompting you to remove the changes to the documentation).
 
-Add `./unbust.sh <output-dir> <initial-commit-hash> [<cache-policy-script>]` to your CDN's build configuration.
+1. Add `./unbust.sh <output-dir> <initial-commit-hash> [<cache-policy-script>]` to your CDN's build configuration, of if you use a javascript framework, you can add the equivalent to the build script in your `project.json` file.
 
-Optionally implement a cache policy script (can be done later). A good sample is found in the demos, including Github workflows implementing cron-based BUILD_HOOK deployments.
+2. (Optionally) implement a cache policy script (can be done later). A good sample is found in the demos, including Github workflows implementing cron-based BUILD_HOOK deployments.
 
-**NOTE** the `initial-commit-hash` argument is very important. It is used to avoid inadvertent persistence DB reset. If the argument matches the deployed commit, and a persistence DB is not found at the PUBLIC_URL, the script generates a new DB. If the argument does not match the commit, it errors out, refusing to gneerate a new DB. In case of configuration errors, persistence will not be easily reset in case of outages, or wrong argument or even bugs.
+3. Implement a build strategy which generates versioned (unique) filenames for static resource when they change. Webpack and similar tools do this easily (see webpack's [Output Filenames guide](https://webpack.js.org/guides/caching/#output-filenames)).
 
+**NOTE** the `initial-commit-hash` argument is very important. It is used to avoid inadvertent persistence DB reset. If the argument matches the deployed commit, and a persistence DB is not found at the `PUBLIC_URL`, the script initializes a new DB (thus discarding any old persistence state). If the argument does not match the commit, the script errors out, refusing to gneerate a new DB. In case of configuration errors, outages or bugs, persistence will not be easily reset.
+
+4. **IMPORTANT** Remove "cache-busting" techniques from your site. They are no longer needed, and are counter productive.
+
+## Post install considerations
+
+This script will put an end to 404's due to missing sub-resources, so you no longer need to resort to 'cache-busting' tricks to attempt avoiding errors in the browser.
+
+With errors reliably eliminated, you are able to rely on caching to improve performance. Use the cache policy to make good use of browser and edge caching (they are your friends). Deciding how long the cache times should be no longer depends on fears of errors, but on deliberate roll-out planning. A long cache time will make future rollouts predictably placed (eg, a 1-month cache time means your user base will be transition to the new version over 1 month). This allows you to limit damage due to botched releases.
+
+Normally minor revisions do not need to be rolled out immediately to all users. Rolling out major revisions is a matter of planning. Do you want all users to experience the new version ASAP, or is it acceptable to introduce gradually? A quick rollout is more risky, because everyone will see all the bugs. A slow rollout means not everyone will benefit from the new features right away, and you'll have to maintain both new and old backend technology for the (longer) rollout perion.
+
+The choice of rollout strategy is beyond the scope of this `README`, suffice to say, the `unbust.sh` script gives you the control and predictability, while giving your users the benefit of full use of the available browser and CDN edge caching.
+
+As the demos show, you can have a deliberate rollout including planned hotfix and maintenance windows.
