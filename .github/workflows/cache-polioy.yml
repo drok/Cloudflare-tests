@@ -1,0 +1,39 @@
+name: Cache Policy deployment
+
+on:
+  schedule:
+    - cron: "0 2 * * 2"  # Every Tuesday at 02:00 UTC
+jobs:
+  deploy-clouddflare:
+    name: Update Cloudflare Pages caching
+    runs-on: ubuntu-latest
+    if: ${{ secrets.CF_DEPLOY_HOOK }}
+    steps:
+      - name: Trigger deploy hook
+        env:
+          CF_DEPLOY_HOOK: ${{ secrets.CF_DEPLOY_HOOK }}
+        run: |
+          curl -X POST "https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/${CF_DEPLOY_HOOK}"
+
+  deploy-netlify:
+    name: Update Netlify caching
+    runs-on: ubuntu-latest
+    if: ${{ secrets.NETLIFY_DEPLOY_HOOK }}
+    steps:
+      - name: Trigger deploy hook
+        env:
+          CF_DEPLOY_HOOK: ${{ secrets.NETLIFY_DEPLOY_HOOK }}
+        run: |
+          curl -X POST "https://api.netlify.com/build_hooks/${DEPLOY_HOOK}"
+
+  deploy-vercel:
+    name: Update Vercel caching
+    runs-on: ubuntu-latest
+    if: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+    steps:
+      - name: Trigger deploy hook
+        env:
+          DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          curl -X POST "https://api.vercel.com/v1/integrations/deploy/${DEPLOY_HOOK}"
+
