@@ -58,7 +58,11 @@ fi
 # Bomb out if any vars are forgotten, declining the deployment
 set -o nounset
 
-if [[ $is_redeployement == 0 ]] ; then
+if [[ "${GITHUB_ACTIONS:-no}" == true ]] ; then
+    # Just allow the build, GitHub Pages are not rebuilt on cron
+    # because setting headers is not supported; policy can't work.
+    cache_state=0
+elif [[ $is_redeployement == 0 ]] ; then
     cache_state=100 # Hotfix-ready
 else
     unset cache_state
@@ -95,6 +99,7 @@ else
         cache_state=102
     fi
 fi
+
 
 # ############# Prepare feedback for demo page ############################
 # The last_deployment calculation is not correct because it samples current time,

@@ -40,7 +40,7 @@ jobs:
         id: build
         run: ./build.sh
 
-      - name: Generate redirect
+      - name: Fetch PUBLIC_URL from api
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -52,7 +52,7 @@ jobs:
           UNBUST_CACHE_KEY: ${{ secrets.UNBUST_CACHE_KEY }}
           UNBUST_CACHE_DBNAME: ${{ vars.UNBUST_CACHE_DBNAME }}
           UNBUST_CACHE_TIME: ${{ vars.UNBUST_CACHE_TIME }}
-        run: set && bash -x tools/unbust.sh out ${{ vars.UNBUST_CACHE_START_COMMIT }} ./cache-policy.sh
+        run: tools/unbust.sh out ${{ vars.UNBUST_CACHE_START_COMMIT }} ./cache-policy.sh
 
       - name: Generate all-files list
         run: find out -type f -ls | sort -n > out/subdir/all-files.txt
