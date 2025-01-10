@@ -10,9 +10,13 @@
 <body>
     <h1>Unbust demo (release <span class="code">_VERSION_</span>)</h1>
     <h3>Cache mode in effect: <span class="code">_CACHE_POLICY_</span></h3>
+    <div class="progress-bar">
+        <div class="progress" id="progress"></div>
+        <span class="label" id="freshness">Best Before (reload timer)</span>
+    </div>
+    This demo of <a href="http://github.com/Archivium/unbust">Archivium cache unbust</a> is re-deployed on a cron job on the 3rd of every month, with <span class="code">UNBUST_CACHE_TIME</span>= "<span class="code">_UNBUST_CACHE_TIME_</span>.
+    <div class="swatch-box">_SWATCH_BOX_</div>
     <div class="text-box">
-        This demo of <a href="http://github.com/Archivium/unbust">Archivium cache unbust</a> is re-deployed on a cron job on the 3rd of every month, with <span class="code">UNBUST_CACHE_TIME</span>= "<span class="code">_UNBUST_CACHE_TIME_"<span>.</div>
-        <div class="swatch-box">_SWATCH_BOX_</div>
         <ul>
             <li>Every month, the major version of the stylesheet is incremented, and a versioned <span class="code">styles.v[$version].css</span> file is generated which is referenced in <a href="http://github.com/Archivium/unbust/blob/unbust/demo/index.html"><span class="code">index.html</span></a>. The background color is changed with every version.</li>
             <li><span class="code">index.html</span> uses style version <span class="code">_VERSION_</span> this release, ie. <a href="_STYLES_FILE_"><span class="code">_STYLES_FILE_</span></a></li>
@@ -81,5 +85,24 @@
         localTzElements.forEach((element) => {
             element.innerText = localTzName;
         });
+
+        let guaranteedFresh = true;
+
+        document.querySelector(".progress-bar").addEventListener("click", function() {
+            guaranteedFresh = !guaranteedFresh;
+            if (guaranteedFresh) {
+                document.querySelector("#freshness").innerText = "Best Before (auto-reload)";
+                document.querySelector(".progress").classList.remove("no-reload");
+            } else {
+                document.querySelector("#freshness").innerText = "Best Before (no auto-reload)";
+                document.querySelector(".progress").classList.add("no-reload");
+            }
+        });
+
+        let timer = setTimeout(function() {
+            if (guaranteedFresh) {
+                window.location.reload();
+            }
+        }, 50000);
 	</script></body>
 </html>
