@@ -7,7 +7,7 @@ date() {
 
 FN=$(date "+%F-%H%M%S")
 
-output_dir=/tmp/out
+output_dir=out
 mkdir -p $output_dir/subdir
 
 deterministic_version() {
@@ -53,7 +53,7 @@ generate_color_swatch
 sed '
     s/_STYLES_FILE_/'styles.v"$version_major".css'/;
     s/_VERSION_/'v"$version_major"'/;
-    s/_SWATCH_BOX_/'"$COLOR_SWATCH_BOX"'/;
+    s@_SWATCH_BOX_@'"$COLOR_SWATCH_BOX"'@;
     ' <index.html > $output_dir/index.html
 
 sed '
