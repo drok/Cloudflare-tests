@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unbust demo (_VERSION_)</title>
     <link rel="stylesheet" href="_STYLES_FILE_">
-    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <h1>Unbust demo (release <span class="code">_VERSION_</span>)</h1>
@@ -102,16 +101,16 @@
         }
 
         function initSupportBar() {
-            const deployed = new Date("_DEPLOYED_TIME_").getTime();
-            const endSupport = deployed + _SUPPORT_TIME_ * 86400 * 1000;
-            var remainingSupport = endSupport - Date.now();
+            const deployed = new Date("_DEPLOYED_TIME_").getTime() / 1000;
+            const endSupport = deployed + _SUPPORT_TIME_ * 86400;
+            var remainingSupport = endSupport - Date.now().getTime() / 1000;
             /* If there was no update by the end support, it is overdue, ie, 0 remaining support commitment */
             remainingSupport = Math.max(0, remainingSupport);
             /* At any point in time, the minimum support is the cache time */
-            remainingSupport = Math.min(remainingSupport, _ENTRY_CACHE_TIME_ * 1000);
+            remainingSupport = Math.max(remainingSupport, _ENTRY_CACHE_TIME_);
 
             supportBar.style.width = `${remainingSupport / (endSupport - deployed) * 100}%`;
-            supportBar.style.animationDuration = `${remainingSupport / 1000}s`;
+            supportBar.style.animationDuration = `${remainingSupport}s`;
 
             if (remainingSupport === 0) {
                 setReloading(document.querySelector(".progress-bar"), false);
