@@ -327,23 +327,23 @@ fi
 # ie, email/slack/calendar/etc.
 #
 sed --in-place '
-    s@_CACHE_POLICY_@'"$cache_policy"'@;
-    s@_ENTRY_CACHE_TIME_@'"$cache_time"'@;
-    s@_HOTFIX_AFTER_@'"$hotfix_after"'@;
-    s@_MAINTENANCE_AFTER_@'"$maintenance_after"'@;
-    s@_STABLE_AFTER_@'"$stable_after"'@;
-    s@_HOTFIX_CACHE_TIME_@'"$hotfix_cache_time_desc"'@;
-    s@_MAINTENANCE_CACHE_TIME_@'"$maintenance_cache_time_desc"'@;
-    s@_STABLE_CACHE_TIME_@'"$stable_cache_time_desc"'@;
-    s@_LAST_DEPLOYMENT_@'"$last_deployment"'@;
-    s@_POLICY_TABLE_CLASS_@'"$policy_table_class"'@;
-    s@_POLICY_IMPOSSIBLE_CLASS_@'"$policy_impossible_class"'@;
-    s@_UNBUST_CACHE_TIME_@'"$UNBUST_CACHE_TIME"'@;
-    s@_UNBUST_CACHE_SUPPORT_@'"$UNBUST_CACHE_SUPPORT"'@;
-    s@_DEPLOYED_TIME_@'"$NOW"'@;
-    s@_SUPPORT_TIME_@'"$support_time"'@;
-    s@_VERSIONED_ASSETS_HEADER_@Cache-Control: '"$versioned_assets_cache_param"'@;
-    s@_ENTRY_POINT_HEADER_@Cache-Control: '"$entry_point_cache_param"'@;
+    s@_CACHE_POLICY_@'"$cache_policy"'@g;
+    s@_ENTRY_CACHE_TIME_@'"$cache_time"'@g;
+    s@_HOTFIX_AFTER_@'"$hotfix_after"'@g;
+    s@_MAINTENANCE_AFTER_@'"$maintenance_after"'@g;
+    s@_STABLE_AFTER_@'"$stable_after"'@g;
+    s@_HOTFIX_CACHE_TIME_@'"$hotfix_cache_time_desc"'@g;
+    s@_MAINTENANCE_CACHE_TIME_@'"$maintenance_cache_time_desc"'@g;
+    s@_STABLE_CACHE_TIME_@'"$stable_cache_time_desc"'@g;
+    s@_LAST_DEPLOYMENT_@'"$last_deployment"'@g;
+    s@_POLICY_TABLE_CLASS_@'"$policy_table_class"'@g;
+    s@_POLICY_IMPOSSIBLE_CLASS_@'"$policy_impossible_class"'@g;
+    s@_UNBUST_CACHE_TIME_@'"$UNBUST_CACHE_TIME"'@g;
+    s@_UNBUST_CACHE_SUPPORT_@'"$UNBUST_CACHE_SUPPORT"'@g;
+    s@_DEPLOYED_TIME_@'"$NOW"'@g;
+    s@_SUPPORT_TIME_@'"$support_time"'@g;
+    s@_VERSIONED_ASSETS_HEADER_@Cache-Control: '"$versioned_assets_cache_param"'@g;
+    s@_ENTRY_POINT_HEADER_@Cache-Control: '"$entry_point_cache_param"'@g;
     ' $output_dir/index.html
 
 # ############# Return the cache state decision to unbust.sh #############

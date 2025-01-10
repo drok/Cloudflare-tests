@@ -49,13 +49,13 @@ generate_color_swatch() {
 generate_color_swatch
 
 sed '
-    s/_STYLES_FILE_/'styles.v"$version_major".css'/;
-    s/_VERSION_/'v"$version_major"'/;
-    s@_SWATCH_BOX_@'"$COLOR_SWATCH_BOX"'@;
+    s/_STYLES_FILE_/'styles.v"$version_major".css'/g;
+    s/_VERSION_/'v"$version_major"'/g;
+    s@_SWATCH_BOX_@'"$COLOR_SWATCH_BOX"'@g;
     ' <index.html > $output_dir/index.html
 
 sed '
-    s/_BACKGROUND_COLOR_/'"${pastel_colors[$((version_major % 32))]}"'/;
+    s/_BACKGROUND_COLOR_/'"${pastel_colors[$((version_major % 32))]}"'/g;
     ' <styles.css > $output_dir/styles.v"$version_major".css
 
 cp $output_dir/styles.v"$version_major".css $output_dir/subdir

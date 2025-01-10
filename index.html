@@ -96,7 +96,7 @@
         let supportBar = document.querySelector(".progress");
 
         function setReloading(e, reload) {
-            const freshness = document.getElementById("#freshness");
+            const freshness = document.getElementById("freshness");
             if (reload) {
                 freshness.innerText = "Remaining Support, out of _SUPPORT_TIME_ days (auto-reload)";
                 supportBar.classList.remove("no-reload");
