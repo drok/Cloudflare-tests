@@ -30,8 +30,6 @@
 #
 # Environment:
 #
-#       PUBLIC_URL - will be used to fetch the old versions of the files and the
-#                   persistence records (a simple git repo)
 #       UNBUST_CACHE_KEY - a secret key used to encrypt the persistence records
 #
 # Other optional setting can be set:
@@ -182,6 +180,7 @@ CDN_set_vars()  {
 	if [[ ${CF_PAGES:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${CF_PAGES_BRANCH}"
 		SOURCE_COMMIT_SHA=${CF_PAGES_COMMIT_SHA::12}
+		PUBLIC_URL=$(echo CF_PAGES_URL | sed -r "s@https://\\w+.@https://$CF_PAGES_BRANCH.@")
 		DEPLOYED_AT_URL=$CF_PAGES_URL # This is a deployment-unique url
 
 	# GitHub Pages

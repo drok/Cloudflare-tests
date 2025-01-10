@@ -62,12 +62,11 @@ The script maintains an encrypted git repository containing records of all deplo
 Required environment variables:
 
   * `UNBUST_CACHE_KEY`: Secret key for encrypting the persistence database
-  * `PUBLIC_URL`: The URL where your site is published (only required at Cloudflare, it is ignored and retrieved from the system build environment variables at build time)
 
 Optional settings:
 
   * `UNBUST_CACHE_TIME`: How long to cache entry points in seconds (default: `86400`, ie, one day). If there is a policy script, this setting is a space-separated list of cache times, one for each policy state, starting with 100.
-  * `UNBUST_CACHE_SUPPORT`: How long this deployment will be supported in days (default: 90 days). If there is a policy script, this setting is a space-separated list of support times, one for each policy state, starting with 100.
+  * `UNBUST_CACHE_SUPPORT`: How long this deployment will be supported in days (default: `90`, ie, 3 months). If there is a policy script, this setting is a space-separated list of support times, one for each policy state, starting with 100.
   * `UNBUST_CACHE_DBNAME`: Name of the encrypted persistence database file (default: `my-unbust-db`)
 
 Implementing a cache policy is optional, by providing the `cache-policy-script` argument, which can be any script or excutable, which is run with state arguments. See below for CDN supporting custom "`Cache-Control`" headers. This implemented with BUILD_HOOKS running on a cron schedule to trigger re-deployment. The cache-policy script calculates the cache terms, or rejects the deployment if no change is needed.
@@ -116,14 +115,15 @@ Example:
 
 Some CDNs do not support custom "`Cache-Control`" headers. In that case, setting a cache policy is not possible.
 
-| CDN | Persisted files | Cache policy | Auto `PUBLIC_URL` variable | DEMO |
+| CDN | Persisted files | Cache policy | DEMO |
 |:------------|:---|:---|:----|:---|
-| Cloudflare Pages | Yes | Yes | No | [Demo](https://unbust.pages.dev/) |
-| Netlify | Yes | Yes | Yes | [Demo](https://unbust.netlify.app/) |
-| GitHub Pages | Yes | No | Yes | [Demo](https://Archivium.github.io/unbust/) |
-| Vercel | Yes[*] | No | Yes | [Demo](https://unbust.vercel.app/) |
+| Cloudflare Pages | Yes | Yes | [Demo](https://unbust.pages.dev/) |
+| Netlify | Yes | Yes | [Demo](https://unbust.netlify.app/) |
+| GitHub Pages | Yes | No | [Demo](https://Archivium.github.io/unbust/) |
+| Vercel | Yes[^1] | No[^2] | [Demo](https://unbust.vercel.app/) |
 
-[*] Custom install command required: `yum -y install wget`
+[^1]: Custom install command required: `yum -y install wget`
+[^2]: Headers can only be hardcoded via `vercel.json` from git. The platform does not read this cfg after the build runs, so the build (and the cache-policy script) cannot set the cache-control headers.
 
 ## Installation
 
