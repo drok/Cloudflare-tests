@@ -38,8 +38,9 @@ deterministic_version
 # Generate color swatch
 generate_color_swatch() {
     COLOR_SWATCH_BOX=""
+    local color
     for i in "${!pastel_colors[@]}"; do
-        local color=${colors[i]}
+        color=${pastel_colors[i]}
         if (( i == (version_major % ${#pastel_colors[@]}) )); then
             class="swatch active-swatch"
         else
