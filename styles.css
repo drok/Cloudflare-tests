@@ -135,13 +135,17 @@ td {
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
+    width: 0%;
     height: 100%;
     background-color: #0f0;
-    /* green */
     animation: empty 50s linear forwards;
-    /* adjust duration as needed */
+    animation-play-state: paused;
+    /* green */
     z-index: -1;
+}
+
+.progress-animated {
+    animation-play-state: running;
 }
 
 .progress:hover {

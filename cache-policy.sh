@@ -223,15 +223,17 @@ esac
 selectSupportAndCacheTime $cache_state
 
 # ############# Set CDN configuration ############################
+versioned_assets_cache_param="max-age=63072000, immutable"
+entry_point_cache_param="max-age=$cache_time"
 if [[ "${CF_PAGES:-no}" == 1 ]] ; then
   cat >> $output_dir/_headers <<EOF
 
 # Versioned presentation assets
 /*.css
-  Cache-Control: max-age=63072000, immutable
+  Cache-Control: $versioned_assets_cache_param
 
 /favicon.ico
-  Cache-Control: max-age=63072000, immutable
+  Cache-Control: $versioned_assets_cache_param
 
 # This is information, must be timely, minimal cache
 /subdir/*.txt
@@ -243,11 +245,11 @@ if [[ "${CF_PAGES:-no}" == 1 ]] ; then
 
 # Unversioned presentation entry-point
 /
-  Cache-Control: max-age=$cache_time
+  Cache-Control: $entry_point_cache_param
 
 # Unversioned presentation entry-point
 /subdir/
-  Cache-Control: max-age=$cache_time
+  Cache-Control: $entry_point_cache_param
 
 EOF
 
@@ -264,12 +266,12 @@ elif [[ "${NETLIFY:-no}" == true ]] ; then
 [[headers]]
   for = "/*.css"
   [headers.values]
-  Cache-Control: max-age=63072000, immutable
+  Cache-Control: $versioned_assets_cache_param
 
 [[headers]]
   for = /favicon.ico
   [headers.values]
-  Cache-Control: max-age=63072000, immutable
+  Cache-Control: $versioned_assets_cache_param
 
 # This is information, must be timely, minimal cache
 [[headers]]
@@ -287,13 +289,13 @@ elif [[ "${NETLIFY:-no}" == true ]] ; then
 [[headers]]
   for = /
   [headers.values]
-  Cache-Control: max-age=$cache_time
+  Cache-Control: $entry_point_cache_param
 
 # Unversioned presentation entry-point
 [[headers]]
   for = /subdir/
   [headers.values]
-  Cache-Control: max-age=$cache_time
+  Cache-Control: $entry_point_cache_param
 
 EOF
 elif [[ "${VERCEL:-no}" == 1 ]] ; then
@@ -301,17 +303,17 @@ elif [[ "${VERCEL:-no}" == 1 ]] ; then
 {
   "headers": [
     { "source": "/*.css",
-      "headers": [{ "key": "Cache-Control", "value": "max-age=63072000, immutable" }]},
+      "headers": [{ "key": "Cache-Control", "value": "$versioned_assets_cache_param" }]},
     { "source": "/favicon.ico",
-      "headers": [{ "key": "Cache-Control", "value": "max-age=63072000, immutable" }]},
+      "headers": [{ "key": "Cache-Control", "value": "$versioned_assets_cache_param" }]},
     { "source": "/subdir/*.txt",
       "headers": [{ "key": "Cache-Control", "value": "max-age=120" }]},
     { "source": "/subdir/unversioned-file",
       "headers": [{ "key": "Cache-Control", "value": "max-age=31536000, must-revalidate" }]},
     { "source": "/",
-      "headers": [{ "key": "Cache-Control", "value": "max-age=$cache_time" }]},
+      "headers": [{ "key": "Cache-Control", "value": "$entry_point_cache_param" }]},
     { "source": "/subdir/",
-      "headers": [{ "key": "Cache-Control", "value": "max-age=$cache_time" }]}
+      "headers": [{ "key": "Cache-Control", "value": "$entry_point_cache_param" }]}
   ]
 }
 EOF
@@ -340,6 +342,8 @@ sed --in-place '
     s@_UNBUST_CACHE_SUPPORT_@'"$UNBUST_CACHE_SUPPORT"'@;
     s@_DEPLOYED_TIME_@'"$NOW"'@;
     s@_SUPPORT_TIME_@'"$support_time"'@;
+    s@_VERSIONED_ASSETS_HEADER_@Cache-Control: '"$versioned_assets_cache_param"'@;
+    s@_ENTRY_POINT_HEADER_@Cache-Control: '"$entry_point_cache_param"'@;
     ' $output_dir/index.html
 
 # ############# Return the cache state decision to unbust.sh #############
