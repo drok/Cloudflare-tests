@@ -1,272 +1,102 @@
 #!/bin/bash
 
-# ############## Unbust cache v.1.0.0 ###############
-#
-# This script persists files published to a CDN across builds, for a given
-# period of time (UNBUST_CACHE_TIME, default=3 months)
-#
-# It should be used together with filenames containing build ID (eg,
-# "myapp.89abcd.min.js"). Without this persistence, when new versions are
-# published, browsers that still request the old files would receive 404's
-# 
-# The persistence ensures that active user sessions, which can last for months
-# or longer, can still find the resources they need, even if the published
-# website includes newer versions of the same resources.
-#
-# It should run in the same directory as the build output, and requires only two
-# environment variables:
-#
-# PUBLIC_URL - will be used to fetch the old versions of the files and the
-#              persistence records (a simple git repo)
-# UNBUST_CACHE_KEY - a secret key used to encrypt the persistence records
-#
-# Other optional setting can be set:
-#
-# UNBUST_CACHE_TIME - the time period to persist old files (default=3 months)
-# UNBUST_CACHE_DBNAME - the encrypted tarball containing the persistence data.
-#                       This will be available as $PUBLIC_URL/$UNBUST_CACHE_DBNAME,
-#                       eg, https://example.com/unbust-cache-db
-#
-# For more details, or bug reports, see https://github.com/archivium/unbust
-#
-# ##########################################################################
-
-error=0
-
-# Required control variables:
-[[ ${UNBUST_CACHE_KEY:+isset} ]] || {
-    >&2 echo "ERROR: UNBUST_CACHE_KEY is not set."
-    error=1
-}
-
-[[ ${PUBLIC_URL:+isset} ]] || {
-    >&2 echo "ERROR: PUBLIC_URL is not set."
-    error=1
-}
-
-# Optional control variables:
-[[ ${UNBUST_CACHE_DBNAME:+isset} ]] || {
-    UNBUST_CACHE_DBNAME=unbust-cache-db
-}
-
-[[ ${UNBUST_CACHE_TIME:+isset} ]] || {
-    UNBUST_CACHE_TIME="3 months ago"
-}
-# ############# End of configuration #########################
-
-set -o errexit
-set -o pipefail
-
-[[ $error == 0 ]] || {
-    >&2 echo "See https://github.com/archivium/unbust"
-    exit 1
-}
-
-
-# ############# CDN support hooks ############################
-#
-# CDN_set_vars() must set the following variables:
-# - SOURCE_COMMIT_SHA   - The commit SHA being deployed
-# - SOURCE_BRANCH       - The branch being deployed
-# - DEPRECATION_MESSAGE - The msg to as commit message when storing state in
-#                         the db. In case you ever look at the db (which is
-#                         a simple git repo tar.bz2 and encrypted), this can
-#                         help with debugging.
-CDN_set_vars()  {
-    # Cloudflare Pages
-    if [ ${CF_PAGES:+isset} ] ; then
-        export GIT_ALTERNATE_OBJECT_DIRECTORIES=$REPO_DIR/.git/objects
-        SOURCE_COMMIT_SHA="$CF_PAGES_COMMIT_SHA"
-        SOURCE_BRANCH=$CF_PAGES_BRANCH
-        DEPRECATION_MESSAGE="Published $(sitestats) from ${CF_PAGES_BRANCH} (${CF_PAGES_COMMIT_SHA::8}), at ${CF_PAGES_URL}"
-    else
-        >&2 echo "ERROR: This CDN is not yet supported."
-        return 1
-        DEPRECATION_MESSAGE="Published $(sitestats)"
-    fi
-}
-# ################ End of CDN support hooks #####################
-
-ENCRYPTION_CIPHER=(-aes-256-cbc -md sha512 -pbkdf2 -iter 1000000 -salt -pass "pass:$UNBUST_CACHE_KEY")
-
-
-# FIXME: git repack fails because tree objects are not added to the db
-
-unset SOURCE_COMMIT_SHA
-
-# FIXME: Implement deployment to subdir of host (ie, wget needs to --cut-dirs)
-DEFAULT_UNBUST_CACHE_TIME="3 months ago"
-
 NOW=$(date +%s)
-
 date() {
-    command date --date=@$NOW "$@"
+	command date --date=@$NOW "$@"
 }
 
-git() {
-    command git -C "${dbdir}" "$@"
-}
+FN=$(date "+%F-%H%M%S")
 
-deprecation_setup() {
-    local dburl="$1"
-
-    export GIT_COMMITTER_DATE=$NOW GIT_AUTHOR_DATE=$NOW GIT_DIR=.git
-
-    # Ensure UNBUST_CACHE_DBNAME is set. There is no default, because it should be
-    # secret
-
-    if [ ! -d "${UNBUST_CACHE_DBNAME}" ] ; then
-        command git -c init.defaultBranch=published init --template=/dev/null "${dbdir}"
-        git config pack.packSizeLimit 20m
-        git config commit.gpgSign false
-        git config gc.pruneExpire now
-        git config user.name "Archivium Cache Bot"
-        git config user.email "unbust-cache-script@archivium.org"
-        
-
-        if ! curl -s --fail "${dburl}/${UNBUST_CACHE_DBNAME}" | 
-            openssl enc "${ENCRYPTION_CIPHER[@]}" -d |
-            tar xjv -C "${dbdir}" ; then
-            git commit --allow-empty -m "Initial commit"
-            git branch empty
-        else
-            git checkout "$branchname"
-        fi
-    fi
-}
-
-# Fetch from the currently published version of the site the files which are
-# deprecated
-deprecation_refill() {
-    local dburl="$1"
-    local obs=${UNBUST_CACHE_TIME:-$DEFAULT_UNBUST_CACHE_TIME} obstime
-
-    if ! obstime=$(date --date="$obs" "+%s") ; then
-        obstime=$(date --date="$DEFAULT_UNBUST_CACHE_TIME" "+%s")
-    fi
-
-    local num_deprecated_commits=$(git rev-list --topo-order --skip=1 --since=${obstime} --count HEAD)
-
-    if [ $num_deprecated_commits -eq 0 ] ; then
-        echo "No deprecated files need to be refilled."
-        return 0
-    fi
-
-    echo "#   Deprecated files (cut-off is $(date --date=@$obstime)):"
-    echo "#   -----------------------------------------------------------"
-
-    local wgetlog=$(mktemp) list=$(mktemp)
-    while read -r commit ; do
-        # echo I will fetch ${commit}
-
-        while read -r file ; do
-            if [ ! -e "$file" ] ; then
-                echo "$file"
-            fi
-
-        done < <(git show "$commit":files 2>/dev/null || :)  >$list
-
-        if [ -s "$list" ] ; then
-            # In case any deprecated file is missing, the deployment should
-            # fail. Reliably preserving deprecated files is the script's ONE JOB
-            #
-            # Wget will return an exit code, the -o errexit flag will cause
-            # script to fail.
-            # TODO : But, ideally, if any of the listed files have gone missing
-            # on the public server, wget can stop right away, not waste time
-            # and bw bandwidth on the files that are still there.
-            #
-            # Recovery - the deployment can be tried again. Maybe the missing
-            # files come back, or enough time passes that a the missing files
-            # become obsolete and are no longer needed.
-            #
-            # Otherwise, the site admin can push the missing files.
-            # Otherwise, some other strategy is needed, that would tell browsers
-            # that how to recover graciously from the missing files (perhaps
-            # a hard refresh)
-            #
-            # Failing to preserve deprecated files is a failure. This script
-            # has ONE JOB, and that is it.
-            #
-            # FIXME: If through some mapping, the deployed files appear in a subdirectory,
-            # need to cut some directories
-            if ! wget --retry-connrefused --recursive --no-host-directories --input-file=$list --base="$dburl" -o "$wgetlog" ; then
-                echo "# ##########################################################"
-                echo "# #######  Failed to download deprecated files: ############"
-                echo "# ##########################################################"
-                cat $wgetlog
-                echo "# ##########################################################"
-                return 1
-            fi
-            local size=($(sed -z 's/\n/\x00/g' $list | du --files0-from=- -sh))
-            local num_files=$(wc -l < $list)
-            git show --quiet --format="format:#  $num_files files, ${size[0]}, published %<|(44)%ar - from: %h %s" $commit
-                
-
-        fi
-    done < <(git rev-list --topo-order --skip=1 --since=${obstime} HEAD)
-    rm -f $wgetlog $list
-}
-
-sitestats() {
-    local num_files=$(/bin/ls -1U | wc -l)
-    local size=($(du -Ssh))
-
-    echo "${num_files} files, ${size[0]}"
-}
-
-deprecation_track() {
-    # public location where the website is published. The deprecation DB will
-    # be stored in the $UNBUST_CACHE_DBNAME directory at that location
-    local dburl="$1"
-    local msg="${2:-Published $(sitestats)}"
-
-    # Implentation choices
-    local branchname=published
-    local remotename=public
-
-    local dbdir=$(mktemp -d)
-
-    # local dbdir=db
-
-    # Ensure we know where the persistent DB is kept
-    [[ ${dburl:+isset} ]] 
-
-    deprecation_setup "${dburl}"
-
-    find -type f -printf '%P\n' >"${dbdir}"/files
-
-    git add -A files
-
-    git commit --allow-empty -m "$msg"
-
-    git gc --quiet
-    git prune-packed
-    git pack-refs --all --prune
-    git update-server-info
-
-    deprecation_refill "${dburl}"
-
-    git checkout empty
-    # FIXME: Max size 25M, then we have to split
-    tar cjf "${UNBUST_CACHE_DBNAME}" --remove-files -C "${dbdir}" "$GIT_DIR" |
-       openssl enc "${ENCRYPTION_CIPHER[@]}" -out "${UNBUST_CACHE_DBNAME}"
-
-    rm -rf $dbdir
-}
-
-FN=$(command date "+%F %H%M%S")
-
-CDN_set_vars
-
-command git remote -v
-set -x
 output_dir=out
-mkdir -p "${output_dir}"
-cd $output_dir
+mkdir -p $output_dir/subdir
 
-echo hello >"$FN"
-mkdir subdir
-echo hello >"subdir/$FN"
+deterministic_version() {
+    # Reference date in YYYY-MM-DD format
+    local REFERENCE_DATE="2024-12-01"
 
-deprecation_track "$PUBLIC_URL" "$DEPRECATION_MESSAGE"
+    # Get current date
+    local CURRENT_DATE=$(date +"%Y-%m-%d")
+
+    # Calculate difference in months
+    local ref_year=$(command date -d  "$REFERENCE_DATE" +%Y)
+    local ref_month=$(command date -d "$REFERENCE_DATE" +%m)
+    local cur_year=$(command date -d  "$CURRENT_DATE" +%Y)
+    local cur_month=$(command date -d "$CURRENT_DATE" +%m)
+    version_major=$((cur_year*12 + cur_month - ref_year*12 - ref_month))
+}
+
+pastel_colors=(
+  "#FFC5C5" "#FFB6C1" "#FF99CC" "#FF7FBF" "#FF66B3" "#FF4C9F" "#FF33A1" "#FF1A85"
+  "#E6DAC3" "#E6C9C5" "#E6B8B8" "#E69FA1" "#E67F8A" "#E65E73" "#E63C5C" "#E61945"
+  "#C5E1F5" "#C5C9F1" "#C5B3EC" "#C59FE6" "#C577E0" "#C54DDC" "#C43BC8" "#C3A5C4"
+  "#F7D2C4" "#F2B9A6" "#ECA289" "#E7A17A" "#E4946D" "#E2815F" "#DF6F50" "#DD5C41"
+)
+
+# Create versioned assets
+deterministic_version
+
+# Generate color swatch
+generate_color_swatch() {
+    COLOR_SWATCH_BOX=""
+    for i in "${!pastel_colors[@]}"; do
+        local color=${colors[$i]}
+        if (( i == version_major % ${#pastel_colors[@]} )); then
+            class="swatch active"
+        else
+            class="swatch"
+        fi
+        COLOR_SWATCH_BOX+="<div class="$class" style='background-color: $color;'><b>$i</b></div>\n"
+    done
+}
+generate_color_swatch
+
+sed '
+    s/_STYLES_FILE_/'styles.v"$version_major".css'/;
+    s/_VERSION_/'v"$version_major"'/;
+    s@_SWATCH_BOX_@'"$COLOR_SWATCH_BOX"'@;
+    ' <index.html > $output_dir/index.html
+
+sed '
+    s/_BACKGROUND_COLOR_/'"${pastel_colors[$((version_major % 32))]}"'/;
+    ' <styles.css > $output_dir/styles.v"$version_major".css
+
+cp $output_dir/styles.v"$version_major".css $output_dir/subdir
+cp favicon.ico $output_dir
+cp dates.html $output_dir
+echo "This unversioned file was last generated on $(date) (with v$version_major release)"> $output_dir/subdir/unversioned-file
+# cp styles.css $output_dir/styles.v"$version_major".css
+
+echo "Generated" > $output_dir/Generated-$FN
+
+# Turn off SPA mode in the subdirectory
+echo "File Not Found (404)" > $output_dir/subdir/404.html
+
+# Generate file listing
+cat >$output_dir/subdir/index.html <<!
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Code Block</title>
+	<style>
+		.code-block {
+			font-family: monospace;
+			background-color: #f7f7f7;
+			padding: 10px;
+			border: 1px solid #ddd;
+			border-radius: 3px;
+			width: 90%;
+			margin: 10px auto;
+		}
+	</style>
+</head>
+<body>
+	<pre class="code-block">
+!
+find $output_dir -type f -ls >>$output_dir/subdir/index.html | sort -n
+cat >>$output_dir/subdir/index.html <<!
+	</pre>
+</body>
+</html>
+!
+
+find $output_dir -type f -ls | sort -n > $output_dir/subdir/generated.txt
