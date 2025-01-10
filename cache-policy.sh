@@ -40,15 +40,6 @@ hotfix_period_desc="1 week"
 maintenance_period=$((3600 * 24 * 7 * 3))
 maintenance_period_desc="3 weeks"
 
-hotfix_cache_time=600
-hotfix_cache_time_desc="10 minutes"
-
-maintenance_cache_time=$((3600 * 24))
-maintenance_cache_time_desc="1 day"
-
-stable_cache_time=$((3600 * 24 * 7))
-stable_cache_time_desc="1 month"
-
 # ############# Demo logic ############################
 # For the Demo, pretend that builds at 2 AM on the 3rd of the month are new builds.
 # Github's cron job triggers every day at 2 AM UTC
@@ -95,7 +86,6 @@ else
                         cache_state=100
                     elif (( time_since_last_deployment < maintenance_period )) ; then
                         cache_state=101
-                        cache_time=$maintenance_cache_time
                         hotfix_after="ended"
                         maintenance_after=$(date -d "+$maintenance_period_desc -$time_since_last_deployment seconds")
                         cache_policy="Maintenance-ready"
@@ -107,6 +97,58 @@ else
     fi
 fi
 
+format_duration() {
+  local seconds=$1
+  local days=$((seconds / 86400))
+  local hours=$(( (seconds % 86400) / 3600 ))
+  local minutes=$(( (seconds % 3600) / 60 ))
+  local secs=$((seconds % 60))
+
+  local result=""
+  if [ $days -gt 0 ]; then
+    result+="${days}d"
+  fi
+  if [ $hours -gt 0 ]; then
+    result+="${hours}h"
+  fi
+  if [ $minutes -gt 0 ]; then
+    result+="${minutes}m"
+  fi
+  if [ $secs -gt 0 ] || [ -z "$result" ]; then
+    result+="${secs}s"
+  fi
+
+  echo "$result"
+}
+
+# Select the support and cache times from the UNBUST_CACHE_SUPPORT and
+# UNBUST_CACHE_TIME arrays, depending of the policy decision ($cache_state)
+selectSupportAndCacheTime()
+{
+    local state=$1
+	local cache_times=($UNBUST_CACHE_TIME)
+	local support_times=($UNBUST_CACHE_SUPPORT)
+
+	if (( state == 0 || (state >= 100 && state < 119) )) ; then
+		local idx
+		if [[ $state != 0 ]] ; then
+			idx=$((state - 100))
+		else
+			idx=0
+		fi
+		cache_time=${cache_times[$idx]:-${cache_times[0]}}
+		support_time=${support_times[$idx]:-${support_times[0]}}
+    fi
+
+    hotfix_cache_time=${cache_times[0]:-${cache_times[0]}}
+    hotfix_cache_time_desc=$(format_duration $hotfix_cache_time)
+
+    maintenance_cache_time=${cache_times[1]:-${cache_times[0]}}
+    maintenance_cache_time_desc=$(format_duration $maintenance_cache_time)
+
+    stable_cache_time=${cache_times[2]:-${cache_times[0]}}
+    stable_cache_time_desc=$(format_duration $stable_cache_time)
+}
 
 # ############# Prepare feedback for demo page ############################
 # The last_deployment calculation is not correct because it samples current time,
@@ -173,6 +215,8 @@ case $cache_state in
             policy_impossible_class="cache-policy-unsupported"
     ;;
 esac
+
+selectSupportAndCacheTime $cache_state
 
 # ############# Set CDN configuration ############################
 if [[ "${CF_PAGES:-no}" == 1 ]] ; then
@@ -289,6 +333,7 @@ sed --in-place '
     s@_POLICY_TABLE_CLASS_@'"$policy_table_class"'@;
     s@_POLICY_IMPOSSIBLE_CLASS_@'"$policy_impossible_class"'@;
     s@_UNBUST_CACHE_TIME_@'"$UNBUST_CACHE_TIME"'@;
+    s@_SUPPORT_TIME_@'"$support_time"'@;
     ' $output_dir/index.html
 
 # ############# Return the cache state decision to unbust.sh #############

@@ -141,9 +141,13 @@ td {
     height: 100%;
     background-color: #0f0;
     /* green */
-    animation: empty 50s forwards;
+    animation: empty 50s linear forwards;
     /* adjust duration as needed */
     z-index: -1;
+}
+
+.progress:hover {
+    opacity: 0.5;
 }
 
 .label {
@@ -156,23 +160,13 @@ td {
 .no-reload {
     opacity: 0.4;
     background-color: black;
-  }
+}
 
 @keyframes empty {
     0% {
         width: 100%;
-        background-color: #0d0;
+        background-color: #00ee0060;
         /* green */
-    }
-
-    50% {
-        background-color: #dd0;
-        /* yellow */
-    }
-
-    75% {
-        background-color: #dda500;
-        /* orange */
     }
 
     100% {

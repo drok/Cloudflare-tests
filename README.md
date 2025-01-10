@@ -66,7 +66,8 @@ Required environment variables:
 
 Optional settings:
 
-  * `UNBUST_CACHE_TIME`: How long to keep old files (default: `3 months ago`)
+  * `UNBUST_CACHE_TIME`: How long to cache entry points in seconds (default: `86400`, ie, one day). If there is a policy script, this setting is a space-separated list of cache times, one for each policy state, starting with 100.
+  * `UNBUST_CACHE_SUPPORT`: How long this deployment will be supported in days (default: 90 days). If there is a policy script, this setting is a space-separated list of support times, one for each policy state, starting with 100.
   * `UNBUST_CACHE_DBNAME`: Name of the encrypted persistence database file (default: `my-unbust-db`)
 
 Implementing a cache policy is optional, by providing the `cache-policy-script` argument, which can be any script or excutable, which is run with state arguments. See below for CDN supporting custom "`Cache-Control`" headers. This implemented with BUILD_HOOKS running on a cron schedule to trigger re-deployment. The cache-policy script calculates the cache terms, or rejects the deployment if no change is needed.
@@ -89,6 +90,27 @@ The cache policy script is called with the following arguments:
      same numeric code previously returned by the cache policy script
      (ie, 0 or 100-119)
   1. output directory
+
+When a policy script is used, the *_TIME and *_SUPPORT variables are lists of cache times and support times, one for each policy state, starting with 100. The first value corresponds to policy state 100, the second to 101, and so on.
+
+"Support" means the developer commits to keep this deployment working correctly for this many days.
+"Cache time" is used as the max-time parameter of the `Cache-Control` header.
+
+Together the support and cache time determine when the versioned published files (eg, app.[hash].js) are kept in the 'deprecated' state. After a newer version of the site is deployed, old files are considered 'deprecated' until the end of support period, after which they are "obsolete" and no longer persisted in deployments. The two variables are used by the unbust.sh script to determine which old files to keep around, and should be used by the policy script as policy parameters to generate headers configuration for the CDN, and to communicate the support commitment to the browser.
+
+Knowing when support ends for a website version allows the browser to reload at support expiration. Otherwise, it risks requesting assets which have been obsoleted and would result in 404 errors. This means the browser can precisely and reliably know when it can rely on static resources being available from the webserver. The demo site uses this info to automatically reload the page at the end of support, and it displays a progress bar indicating how much "freshness" remains before the forced reload.
+
+Example:
+
+   Suppose UNBUST_CACHE_TIME="600 86400 2592000" and UNBUST_CACHE_SUPPORT="30 90 365", and the three policy states are 100 (Hotfix-ready), 101 (Maintenance-ready), and 102 (Stable).
+
+   This means that immediately after a new version is deployed, the site will be in "Hotfix-ready" state (for as long as your policy script decides). In this state, Cache-Control headers will be set to 10 minutes, and you're signalling to the browsers that you're committed to support this new version for 30 days. At the expiration of the 30 days, any visitors's browsers open tabs will reload.
+
+   At the same time, if you fix any bugs during the hotfix-readiness window, new visitors will see the bugfixes within 10 minutes. Visitors with open tabs won't see the bugfixes unless the manually reload (F5) or they keep the tab open for 30 days, or navigate away and back after 10 minutes or longer (the browser will revalidate after 10 minutes)
+
+    The Maintenance-readiness timing have similar semantics.
+
+    On the other hand, once the project reaches Stable state, tabs can remain open for one year, and function reliably, even if in the meanwhile you release new versions. The open tabs will find the now deprecated assets for up to 365 days after the initial release. The long cache time of one month means that an SPA open in a tab will function even offline, as it will be cached on the device, and will not require revalidation for an entire month.
 
 ## CDN support
 

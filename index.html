@@ -12,7 +12,7 @@
     <h3>Cache mode in effect: <span class="code">_CACHE_POLICY_</span></h3>
     <div class="progress-bar">
         <div class="progress" id="progress"></div>
-        <span class="label" id="freshness">Best Before (reload timer)</span>
+        <span class="label" id="freshness">Remaining Support</span>
     </div>
     This demo of <a href="http://github.com/Archivium/unbust">Archivium cache unbust</a> is re-deployed on a cron job on the 3rd of every month, with <span class="code">UNBUST_CACHE_TIME</span>= "<span class="code">_UNBUST_CACHE_TIME_</span>.
     <div class="swatch-box">_SWATCH_BOX_</div>
@@ -87,16 +87,39 @@
         });
 
         let guaranteedFresh = true;
+        let supportBar = document.querySelector(".progress");
 
-        document.querySelector(".progress-bar").addEventListener("click", function() {
-            guaranteedFresh = !guaranteedFresh;
-            if (guaranteedFresh) {
-                document.querySelector("#freshness").innerText = "Best Before (auto-reload)";
-                document.querySelector(".progress").classList.remove("no-reload");
+        function setReloading(e, reload) {
+            if (reload) {
+                event.target.innerText = "Remaining Support, out of _SUPPORT_TIME_ days (auto-reload)";
+                supportBar.classList.remove("no-reload");
             } else {
-                document.querySelector("#freshness").innerText = "Best Before (no auto-reload)";
-                document.querySelector(".progress").classList.add("no-reload");
+                event.target.innerText = "Remaining Support, out of _SUPPORT_TIME_ days (no auto-reload)";
+                supportBar.classList.add("no-reload");
             }
+            guaranteedFresh = reload;
+        }
+
+        function initSupportBar() {
+            const deployed = new Date("_DEPLOYED_TIME_").getTime();
+            const endSupport = deployed + _SUPPORT_TIME_ * 86400 * 1000;
+            var remainingSupport = endSupport - Date.now();
+            /* If there was no update by the end support, it is overdue, ie, 0 remaining support commitment */
+            remainingSupport = Math.max(0, remainingSupport);
+            /* At any point in time, the minimum support is the cache time */
+            remainingSupport = Math.min(remainingSupport, _ENTRY_CACHE_TIME_ * 1000);
+
+            supportBar.style.width = `${remainingSupport / (endSupport - deployed) * 100}%`;
+            supportBar.style.animationDuration = `${remainingSupport / 1000}s`;
+
+            if (remainingSupport === 0) {
+                setReloading(document.querySelector(".progress-bar"), false);
+            }
+        }
+
+        initSupportBar();
+        document.querySelector(".progress-bar").addEventListener("click", function(event) {
+            setReloading(event.target, !guaranteedFresh);
         });
 
         let timer = setTimeout(function() {
