@@ -62,6 +62,7 @@ The script maintains an encrypted git repository containing records of all deplo
 Required environment variables:
 
   * `UNBUST_CACHE_KEY`: Secret key for encrypting the persistence database
+  * `CF_BUG_756652_WORKAROUND`: Required only on Cloudflare Pages, ([bug 756652](https://community.cloudflare.com/t/branch-alias-url-for-pages-production-env/756652)): two word setting. First word: Production Environemnt branch name, Second word: project URL (at pages.dev). Eg. for this project (`unbust`), the Production branch for the demo site is `unbust/demo`, so the correct setting is `unbust/demo https://unbust.pages.dev`.
 
 Optional settings:
 

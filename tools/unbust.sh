@@ -31,23 +31,39 @@
 # Environment:
 #
 #       UNBUST_CACHE_KEY - a secret key used to encrypt the persistence records
+#       CF_BUG_756652_WORKAROUND - Required only on Cloudflare Pages. two word
+#					setting. First word: Production Environemnt branch name,
+#                   Second word: project URL (at pages.dev).
+#                   Eg. for this project (`unbust`), the Production branch for
+#                   the demo site is `unbust/demo`, so the correct setting is
+#					CF_BUG_756652_WORKAROUND="unbust/demo https://unbust.pages.dev"
+# See https://community.cloudflare.com/t/branch-alias-url-for-pages-production-env/756652
+#
+#
 #
 # Other optional setting can be set:
 #
 #       UNBUST_CACHE_SUPPORT - time in days that the release will be supported
-#                   (default = 90). This can be a list of periods if cache policy
-#                   is implemented, one period for each policy mode. The first figure
-#                   is considered the fallback period. Otherwise, the first corresponds to
+#                   This can be a list of
+#                   periods if cache policy is implemented, one period
+#                   for each policy mode. The first figure is considered
+#                   the fallback period. Otherwise, the first corresponds to
 #                   policy 100, the second to policy 101 and so on.
+#                   Default: 90 (ie, 3 months)
+#
 #       UNBUST_CACHE_TIME - cache time in seconds that the entry points (*.html)
+#
 #                   should be cached (ie, the max-time arg of Cache-Control: headers)
 #                   This can be a list of cache times if cache policy is implemented,
 #                   one cache time for each policy mode. The first is a fallback, and each
 #                   figure corresponds to a policy, as UNBUST_CACHE_SUPPORT above.
+#                   Default: 86400 (ie, 1 day)
+#
 #       UNBUST_CACHE_DBNAME - the encrypted tarball filename containing the
 #                   persistence database. This will be available as
-#                   $PUBLIC_URL/$UNBUST_CACHE_DBNAME, (default=unbust-cache-db)
+#                   $BRANCH_URL/$UNBUST_CACHE_DBNAME,
 #                       eg, "my-unbust-db"
+# 					Default: unbust-cache-db
 #
 # Cache logic:
 #
@@ -171,7 +187,7 @@ set -o nounset
 #                         help with debugging.
 # - SOURCE_COMMIT_SHA   - The commit hash of the source repo that is deployed
 # - DEPLOYED_AT_URL		- The URL of the deployed site for this commit
-# - PUBLIC_URL          - The URL where the branch is deployed
+# - BRANCH_URL          - The URL where the branch is deployed
 #                         Note: For Cloudflare, this must be set in the
 #						  calling environment. It cannot be detected
 CDN_set_vars()  {
@@ -180,43 +196,51 @@ CDN_set_vars()  {
 	if [[ ${CF_PAGES:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${CF_PAGES_BRANCH}"
 		SOURCE_COMMIT_SHA=${CF_PAGES_COMMIT_SHA::12}
-		PUBLIC_URL=$(echo $CF_PAGES_URL | sed -r "s@https://\\w+.@https://$CF_PAGES_BRANCH.@")
+		# replace non-alphanums with dashes in branch Alias URL
+		# https://developers.cloudflare.com/pages/configuration/preview-deployments/#preview-aliases
+		# https://community.cloudflare.com/t/branch-alias-url-for-pages-production-env/756652
+		# On Cloudflare Pages, a branch URL Alias is not available for Production builds (if Preview Deployments are disabled)
+		# See community discussion above.
+		# This workaround should work for both preview and production.
+		# Set the Environment variable CF_BUG_756652_WORKAROUND to contain both the production branch name and the
+		# project URL, which is what the branch URL would point to. Example:
+		# CF_BUG_756652_WORKAROUND="release https://my-project.pages.dev"
+		if [[ ${CF_BUG_756652_WORKAROUND:+isset} ]] ; then
+			local cf_production_branch_alias_params=($CF_BUG_756652_WORKAROUND)
+			if [[ ${cf_production_branch_alias_params[0]} == ${CF_PAGES_BRANCH} ]] ; then
+				BRANCH_URL=${cf_production_branch_alias_params[1]}
+			else
+				local escaped_branch=$(echo $CF_PAGES_BRANCH | sed 's@[^[:alnum:]]@-@g;')
+				BRANCH_URL=$(echo $CF_PAGES_URL | sed -r "s@https://\\w+.@https://$escaped_branch.@")
+			fi
+		fi
 		DEPLOYED_AT_URL=$CF_PAGES_URL # This is a deployment-unique url
 
 	# GitHub Pages
 	elif [[ ${GITHUB_ACTIONS:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${GITHUB_REF}"
 		SOURCE_COMMIT_SHA=${GITHUB_SHA::12}
-		PUBLIC_URL=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.html_url')
-		DEPLOYED_AT_URL=$PUBLIC_URL
+		BRANCH_URL=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.html_url')
+		DEPLOYED_AT_URL=$BRANCH_URL
 	
 	# Netlify
 	elif [[ ${NETLIFY:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${BRANCH}"
 		SOURCE_COMMIT_SHA=${COMMIT_REF::12}
-		PUBLIC_URL=$DEPLOY_PRIME_URL
+		BRANCH_URL=$DEPLOY_PRIME_URL
 		DEPLOYED_AT_URL=$DEPLOY_URL
 
 	# Vercel
 	elif [[ ${VERCEL:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${VERCEL_GIT_COMMIT_REF}"
 		SOURCE_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA::12}
-		PUBLIC_URL=https://$VERCEL_BRANCH_URL
-		DEPLOYED_AT_URL=$PUBLIC_URL
+		BRANCH_URL=https://$VERCEL_BRANCH_URL
+		DEPLOYED_AT_URL=$BRANCH_URL
 	else
 		>&2 echo "ERROR: This CDN is not yet supported."
 		return 1
 		DEPRECATION_MESSAGE="Published $(sitestats)"
 	fi
-
-	# Check that after CDN, a PUBLIC_URL is found. Some CDNs (Cloudflare Pages)
-	# need this specified as environment variable.
-	# Most autodetect it (Github, Netlify)
-	[[ ${PUBLIC_URL:+isset} ]] || {
-		>&2 echo "ERROR: PUBLIC_URL is not set."
-		error=1
-	}
-
 }
 # ################ End of CDN support hooks #####################
 
@@ -270,7 +294,7 @@ deprecation_setup() {
 			>&2 echo "       Refusing to create a new one because the initial commit hash is not the same as the current commit."
 			if [[ $fetch_status == 404 ]] ; then
 				>&2 echo "       No persistence DB exists at ${dburl}/${UNBUST_CACHE_DBNAME} (404)."
-				>&2 echo "       This is a configuration error (PUBLIC_URL mismatch?)"
+				>&2 echo "       This is a configuration error (BRANCH_URL mismatch?)"
 			else
 				>&2 echo "       If it's a network error, try again later. Curl said ($fetch_status)."
 			fi
@@ -303,7 +327,7 @@ deprecation_setup() {
 # deprecated
 deprecation_refill() {
 	local dburl="$1"
-	# Get the path depth of the PUBLIC_URL, so wget can --cut-dirs
+	# Get the path depth of the BRANCH_URL, so wget can --cut-dirs
 	local urldepth=$(python3 -c "import os, urllib.parse; from pathlib import Path; print(len(Path(urllib.parse.urlparse(\"$dburl\").path.strip(\"/\")).parents))")
 	# local obs=${UNBUST_CACHE_TIME:-$DEFAULT_UNBUST_CACHE_TIME} obstime
 
@@ -582,7 +606,7 @@ unset opt OPTARG
 OPTIND=1
 while getopts ":fh" opt ; do
 	case $opt in
-		f) fetch_repo "$PUBLIC_URL"
+		f) fetch_repo "$BRANCH_URL"
 		exit 0
 				;;
 		h) usage
@@ -618,4 +642,4 @@ INITIAL_COMMIT_SHA="$2"
 
 CDN_set_vars
 
-deprecation_track "$PUBLIC_URL" "$DEPRECATION_MESSAGE" "${3:-}" "$1"
+deprecation_track "$BRANCH_URL" "$DEPRECATION_MESSAGE" "${3:-}" "$1"
