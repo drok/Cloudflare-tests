@@ -25,6 +25,14 @@ time_since_last_deployment=$2
 last_cache_state=$3
 output_dir=$4
 
+[[ ${UNBUST_CACHE_SUPPORT:+isset} ]] || {
+	UNBUST_CACHE_SUPPORT=90 # 3 months.
+}
+
+[[ ${UNBUST_CACHE_TIME:+isset} ]] || {
+	UNBUST_CACHE_TIME=$(( 24 * 3600 )) # one day, in seconds
+}
+
 # ############# Policy choices ############################
 hotfix_period=$((3600 * 24 * 7))
 hotfix_period_desc="1 week"

@@ -36,8 +36,16 @@
 #
 # Other optional setting can be set:
 #
-#       UNBUST_CACHE_TIME - the time period to persist old files
-#                   (default=3 months)
+#       UNBUST_CACHE_SUPPORT - time in days that the release will be supported
+#                   (default = 90). This can be a list of periods if cache policy
+#                   is implemented, one period for each policy mode. The first figure
+#                   is considered the fallback period. Otherwise, the first corresponds to
+#                   policy 100, the second to policy 101 and so on.
+#       UNBUST_CACHE_TIME - cache time in seconds that the entry points (*.html)
+#                   should be cached (ie, the max-time arg of Cache-Control: headers)
+#                   This can be a list of cache times if cache policy is implemented,
+#                   one cache time for each policy mode. The first is a fallback, and each
+#                   figure corresponds to a policy, as UNBUST_CACHE_SUPPORT above.
 #       UNBUST_CACHE_DBNAME - the encrypted tarball filename containing the
 #                   persistence database. This will be available as
 #                   $PUBLIC_URL/$UNBUST_CACHE_DBNAME, (default=unbust-cache-db)
@@ -137,13 +145,18 @@ error=0
 	UNBUST_CACHE_DBNAME=unbust-cache-db
 }
 
+[[ ${UNBUST_CACHE_SUPPORT:+isset} ]] || {
+	UNBUST_CACHE_SUPPORT=90 # 3 months.
+}
+
 [[ ${UNBUST_CACHE_TIME:+isset} ]] || {
-	UNBUST_CACHE_TIME="3 months ago"
+	UNBUST_CACHE_TIME=$(( 24 * 3600 )) # one day, in seconds
 }
 # ############# End of configuration #########################
 
 set -o errexit
 set -o pipefail
+set -o nounset
 
 [[ $error == 0 ]] || {
 	>&2 echo "See https://github.com/archivium/unbust"
@@ -168,27 +181,27 @@ CDN_set_vars()  {
 	# Cloudflare Pages
 	if [[ ${CF_PAGES:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${CF_PAGES_BRANCH}"
-		SOURCE_COMMIT_SHA=$CF_PAGES_COMMIT_SHA
+		SOURCE_COMMIT_SHA=${CF_PAGES_COMMIT_SHA::12}
 		DEPLOYED_AT_URL=$CF_PAGES_URL # This is a deployment-unique url
 
 	# GitHub Pages
 	elif [[ ${GITHUB_ACTIONS:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${GITHUB_REF}"
-		SOURCE_COMMIT_SHA=$GITHUB_SHA
+		SOURCE_COMMIT_SHA=${GITHUB_SHA::12}
 		PUBLIC_URL=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.html_url')
 		DEPLOYED_AT_URL=$PUBLIC_URL
 	
 	# Netlify
 	elif [[ ${NETLIFY:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${BRANCH}"
-		SOURCE_COMMIT_SHA=$COMMIT_REF
+		SOURCE_COMMIT_SHA=${COMMIT_REF::12}
 		PUBLIC_URL=$DEPLOY_PRIME_URL
 		DEPLOYED_AT_URL=$DEPLOY_URL
 
 	# Vercel
 	elif [[ ${VERCEL:+isset} ]] ; then
 		DEPRECATION_MESSAGE="Published $(sitestats) from ${VERCEL_GIT_COMMIT_REF}"
-		SOURCE_COMMIT_SHA=$VERCEL_GIT_COMMIT_SHA
+		SOURCE_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA::12}
 		PUBLIC_URL=https://$VERCEL_BRANCH_URL
 		DEPLOYED_AT_URL=$PUBLIC_URL
 	else
@@ -214,7 +227,7 @@ ENCRYPTION_CIPHER=(-aes-256-cbc -md sha512 -pbkdf2 -iter 1000000 -salt -pass "pa
 # FIXME: git repack fails because tree objects are not added to the db
 
 # FIXME: Implement deployment to subdir of host (ie, wget needs to --cut-dirs)
-DEFAULT_UNBUST_CACHE_TIME="3 months ago"
+DEFAULT_UNBUST_CACHE_TIME=90
 
 NOW=$(date +%s)
 
@@ -250,7 +263,7 @@ deprecation_setup() {
 		# If the db is empty, create a new one
 		# But prevent inadventently resetting persistence state due to
 		# misconfiguration or a network error
-		pushd
+		pushd >/dev/null
 		local HEAD initial_sha
 		if ! HEAD=$(command git rev-parse HEAD) || ! initial_sha=$(command git rev-parse $INITIAL_COMMIT_SHA) || [ "$HEAD" != "$initial_sha" ]; then
 
@@ -264,7 +277,7 @@ deprecation_setup() {
 			fi
 			exit 1
 		fi
-		pushd
+		pushd >/dev/null
 		command git -c init.defaultBranch=published init --quiet --template=/dev/null "${dbdir}"
 		git config pack.packSizeLimit 20m
 		git config commit.gpgSign false
@@ -293,32 +306,62 @@ deprecation_refill() {
 	local dburl="$1"
 	# Get the path depth of the PUBLIC_URL, so wget can --cut-dirs
 	local urldepth=$(python3 -c "import os, urllib.parse; from pathlib import Path; print(len(Path(urllib.parse.urlparse(\"$dburl\").path.strip(\"/\")).parents))")
-	local obs=${UNBUST_CACHE_TIME:-$DEFAULT_UNBUST_CACHE_TIME} obstime
+	# local obs=${UNBUST_CACHE_TIME:-$DEFAULT_UNBUST_CACHE_TIME} obstime
 
-	if ! obstime=$(date --date="$obs" "+%s") ; then
-		obstime=$(date --date="$DEFAULT_UNBUST_CACHE_TIME" "+%s")
-	fi
+	#if ! obstime=$(date --date="$obs" "+%s") ; then
+	#	obstime=$(date --date="$DEFAULT_UNBUST_CACHE_TIME" "+%s")
+	#fi
 
-	# Trim DB to only the relevant history. This ensures that increasing the UNBUST_CACHE_TIME does
-	# not result in errors due to already missing files.
-	# It also keeps the size of the DB from growing
-	# Failing is allowed because when UNBUST_CACHE_TIME is increased, it's an
-	# attempt to look further into the history than the graft.
-	git pull --shallow-since=${obstime} . || :
+#	local num_deprecated_commits=$(git rev-list --topo-order --skip=1 --since=${obstime} --count HEAD)
+#
+#	if [ $num_deprecated_commits -eq 0 ] ; then
+#		echo "No deprecated files need to be refilled."
+#		return 0
+#	fi
 
-	local num_deprecated_commits=$(git rev-list --topo-order --skip=1 --since=${obstime} --count HEAD)
-
-	if [ $num_deprecated_commits -eq 0 ] ; then
-		echo "No deprecated files need to be refilled."
-		return 0
-	fi
-
-	echo "#   Deprecated files (cut-off is $(date --date=@$obstime)):"
+	echo "#   Deprecated files:"
 	echo "#   -----------------------------------------------------------"
 
 	local wgetlog=$(mktemp) list=$(mktemp)
+	local trim_cutoff
+	# When was the replacement deployment made
+	local replacement_time=$NOW deployment_time
 	while read -r commit ; do
 
+		# Calculate if this deployment ($commit) is deprecated or obsolete
+		local cache_state support_time cache_time commit_url deploy_sha trailer
+		while read -r trailer cache_state support_time cache_time deploy_sha unused ; do
+			case ${trailer,,} in
+				unbust) break
+					;;
+				# TODO: recover the commit deployment URL and use it for fetching.
+				# The problem: the last deployed fileset may include files from a newer
+				# deployment that has since become obsolete (eg, from a hotfix now expired)
+				# Fetching from the commit deployment URL will get the correct file,
+				# but possibly a different/older file that was last deployed at the branch
+				# deployment URL. The website might work with the hotfix file (from branch
+				# deployment URL), but not with the "proper" file, from the correct commit
+				# deployment URL.
+				# Not implementing this because it seems more wise to preserve last
+				# state rather than correct it.
+			esac
+		done < <(git show -s --format=format:%B --no-decorate $commit | git interpret-trailers --parse --trim-empty)
+
+		# This deployment commit is supported the next/replacement deployment is less than
+		# $cache_time old (ie, the cached entry-point is still valid),
+		# or the deployment time is less than $support_time old (ie, open tabs still need it)
+
+		deployment_time=$(git show -s --format=%at $commit)
+		if (( NOW - replacement_time >= cache_time || NOW - deployment_time >= (support_time * 24 * 3600) )) ; then
+			replacement_time=$deployment_time
+			continue
+		fi
+		replacement_time=$deployment_time
+
+		# low watermark - the earliest useful deployment commit
+		trim_cutoff=$commit
+
+		# Get a list of (deprecated) files that need to be fetched
 		while read -r file ; do
 			if [ ! -e "$file" ] ; then
 				echo "$file"
@@ -326,6 +369,7 @@ deprecation_refill() {
 		done < <(git show "$commit":files 2>/dev/null || :)  >$list
 
 		if [ -s "$list" ] ; then
+
 			# In case any deprecated file is missing, the deployment should
 			# fail. Reliably preserving deprecated files is the script's ONE JOB
 			#
@@ -362,7 +406,12 @@ deprecation_refill() {
 			git show --quiet --format="format:#  $num_files files, ${size[0]}, published %<|(44)%ar - from: %h %s" $commit
 			echo ""
 		fi
-	done < <(git rev-list --topo-order --skip=1 --since=${obstime} HEAD)
+	done < <(git rev-list --topo-order --skip=1 HEAD)
+
+	# Trim DB to only the relevant history.
+	# git --no-pager log --graph --all
+	# trim_cutoff=7d44daff589c6a557f9c6d26a4bd49e3d73031f1
+	if [[ ${trim_cutoff:+isset} ]] ; then echo $trim_cutoff > $dbdir/.git/shallow ; fi
 	rm -f $wgetlog $list
 }
 
@@ -382,39 +431,37 @@ record_caching_state() {
 	local cache_state="initial"
 	local is_redeployement=0
 
-	if [[ ${SOURCE_COMMIT_SHA:+isset} ]] ; then
-		while read -r trailer content unused ; do
-			case ${trailer,,} in
-				source)
-					if [[ $content == ${SOURCE_COMMIT_SHA::10} ]] ; then
-								is_redeployement=1
-					fi
-					;;
-				cache) cache_state=$content
-					;;
-			esac
-		done < <(git show -s --no-decorate | git interpret-trailers --parse --trim-empty)
+	local cache_times=($UNBUST_CACHE_TIME)
+	local support_times=($UNBUST_CACHE_SUPPORT)
+
+	local cache_state support_time cache_time commit_url deploy_sha trailer
+	while read -r trailer cache_state support_time cache_time deploy_sha unused ; do
+		case ${trailer,,} in
+			unbust) break
+				;;
+		esac
+	done < <(git show -s --format=format:%B --no-decorate | git interpret-trailers --parse --trim-empty)
+	if [[ "$deploy_sha" == "$SOURCE_COMMIT_SHA" ]] ; then
+				is_redeployement=1
 	fi
 
-	pushd
-	$cache_logic_script $is_redeployement $last_commit_time $cache_state "$outdir" && cache_state=$? || cache_state=$?
-	pushd
-
-	case $cache_state in
-		100) cache_state_msg="Hotfix-ready"
-		;;
-		101) cache_state_msg="Maintenance-ready"
-		;;
-		102) cache_state_msg="Stable"
-		;;
-	esac
+	pushd >/dev/null
+	$cache_logic_script $is_redeployement $last_commit_time ${cache_state:-0} "$outdir" && cache_state=$? || cache_state=$?
+	pushd >/dev/null
 
 	if (( cache_state == 0 || (cache_state >= 100 && cache_state < 119) )) ; then
-		if [[ ${cache_state_msg:+isset} ]] ; then
-			trailers+=(--trailer "Cache: $cache_state - ${cache_state_msg}")
+		local idx
+		if [[ $cache_state != 0 ]] ; then
+			idx=$((cache_state - 100))
 		else
-			trailers+=(--trailer "Cache: ${cache_state}")
+			idx=0
 		fi
+		local cache_time=${cache_times[$idx]:-${cache_times[0]}}
+		local support_time=${support_times[$idx]:-${support_times[0]}}
+		trailers+=(
+			--trailer "Unbust: $cache_state $support_time $cache_time $SOURCE_COMMIT_SHA"
+			--trailer "Url: $DEPLOYED_AT_URL"
+		)
 
 		# if git checkout $cache_branch ; then
 		# 	git merge --no-edit -m "$cache_state_msg" "$publish_branch"
@@ -455,16 +502,13 @@ deprecation_track() {
 
 	local last_commit_time
 	if [[ ${cache_logic_script:+isset} ]] ; then
-		last_commit_time=$(git log -1 --format=%at)
+		last_commit_time=$(git --no-pager log -1 --format=%at)
 	fi
 
 	if [[ ${last_commit_time:+isset} ]] ; then
 		record_caching_state "$cache_logic_script" "$((NOW - last_commit_time))" "$outdir"
 	fi
 
-	if [[ ${SOURCE_COMMIT_SHA:+isset} ]] ; then
-		trailers+=(--trailer "Source: ${SOURCE_COMMIT_SHA::10}")
-	fi
 	if [[ ${#trailers[@]} -gt 0 ]] ; then
 		msg=$(echo "$msg" | git interpret-trailers "${trailers[@]}")
 	fi
@@ -569,7 +613,7 @@ if [[ $# -ge 3 ]] ; then
 	}
 fi
 
-pushd "$1"
+pushd "$1" >/dev/null
 
 INITIAL_COMMIT_SHA="$2"
 

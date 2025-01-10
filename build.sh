@@ -7,7 +7,7 @@ date() {
 
 FN=$(date "+%F-%H%M%S")
 
-output_dir=out
+output_dir=/tmp/out
 mkdir -p $output_dir/subdir
 
 deterministic_version() {
