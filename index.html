@@ -14,7 +14,7 @@
         <div class="progress" id="progress"></div>
         <span class="label" id="freshness">Remaining Support</span>
     </div>
-    This demo of <a href="http://github.com/Archivium/unbust">Archivium cache unbust</a> is re-deployed on a cron job on the 3rd of every month, with <span class="code">UNBUST_CACHE_TIME</span>= "<span class="code">_UNBUST_CACHE_TIME_</span>.
+    This demo of <a href="http://github.com/Archivium/unbust">Archivium cache unbust</a> is re-deployed on a cron job on the 3rd of every month, with <span class="code">UNBUST_CACHE_TIME</span>= "<span class="code">_UNBUST_CACHE_TIME_</span>".
     <div class="swatch-box">_SWATCH_BOX_</div>
     <div class="text-box">
         <ul>
@@ -90,11 +90,12 @@
         let supportBar = document.querySelector(".progress");
 
         function setReloading(e, reload) {
+            const freshness = supportBar.querySelector("#freshness");
             if (reload) {
-                event.target.innerText = "Remaining Support, out of _SUPPORT_TIME_ days (auto-reload)";
+                freshness.innerText = "Remaining Support, out of _SUPPORT_TIME_ days (auto-reload)";
                 supportBar.classList.remove("no-reload");
             } else {
-                event.target.innerText = "Remaining Support, out of _SUPPORT_TIME_ days (no auto-reload)";
+                freshness.innerText = "Remaining Support, out of _SUPPORT_TIME_ days (no auto-reload)";
                 supportBar.classList.add("no-reload");
             }
             guaranteedFresh = reload;

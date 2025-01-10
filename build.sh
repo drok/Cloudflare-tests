@@ -27,9 +27,9 @@ deterministic_version() {
 
 pastel_colors=(
   "#FFC5C5" "#FFB6C1" "#FF99CC" "#FF7FBF" "#FF66B3" "#FF4C9F" "#FF33A1" "#FF1A85"
-  "#E6DAC3" "#E6C9C5" "#E6B8B8" "#E69FA1" "#E67F8A" "#E65E73" "#E63C5C" "#E61945"
-  "#C5E1F5" "#C5C9F1" "#C5B3EC" "#C59FE6" "#C577E0" "#C54DDC" "#C43BC8" "#C3A5C4"
-  "#F7D2C4" "#F2B9A6" "#ECA289" "#E7A17A" "#E4946D" "#E2815F" "#DF6F50" "#DD5C41"
+  # "#E6DAC3" "#E6C9C5" "#E6B8B8" "#E69FA1" "#E67F8A" "#E65E73" "#E63C5C" "#E61945"
+  # "#C5E1F5" "#C5C9F1" "#C5B3EC" "#C59FE6" "#C577E0" "#C54DDC" "#C43BC8" "#C3A5C4"
+  # "#F7D2C4" "#F2B9A6" "#ECA289" "#E7A17A" "#E4946D" "#E2815F" "#DF6F50" "#DD5C41"
 )
 
 # Create versioned assets
@@ -39,13 +39,13 @@ deterministic_version
 generate_color_swatch() {
     COLOR_SWATCH_BOX=""
     for i in "${!pastel_colors[@]}"; do
-        local color=${colors[$i]}
-        if (( i == version_major % ${#pastel_colors[@]} )); then
-            class="swatch active"
+        local color=${colors[i]}
+        if (( i == (version_major % ${#pastel_colors[@]}) )); then
+            class="swatch active-swatch"
         else
             class="swatch"
         fi
-        COLOR_SWATCH_BOX+="<div class="$class" style='background-color: $color;'><b>$i</b></div>\n"
+        COLOR_SWATCH_BOX+="<div class=\"$class\" style=\"background-color: $color;"><b>$i</b></div>\n"
     done
 }
 generate_color_swatch
