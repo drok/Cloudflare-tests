@@ -107,6 +107,21 @@
             guaranteedFresh = reload;
         }
 
+        const MAX_INT32 = 2 ** 31 - 1; // 2147483647 (hex 0x7FFFFFFF)
+
+        function runAt(func, date) {
+            const now = Date.now();
+            const then = date.valueOf();
+            const diff = Math.max(then - now, 0);
+            if (diff > MAX_INT32) {
+                setTimeout(() => {
+                    runAt(func, date);
+                }, MAX_INT32);
+            } else {
+                setTimeout(func, diff);
+            }
+        }
+
         function initSupportBar() {
             const deployed = new Date("_DEPLOYED_TIME_").getTime() / 1000;
             const endSupport = deployed + _SUPPORT_TIME_ * 86400;
@@ -124,11 +139,11 @@
             supportBar.classList.add("progress-animated");
             supportBar.style.animationDuration = `${remainingSupport}s`;
 
-            setTimeout(function() {
+            runAt(function() {
                 if (guaranteedFresh) {
                     window.location.reload();
                 }
-            }, remainingSupport);
+            }, (remainingSupport * 1000.0 + Date.now()));
         }
 
         initSupportBar();
