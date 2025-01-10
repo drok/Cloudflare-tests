@@ -45,7 +45,7 @@ generate_color_swatch() {
         else
             class="swatch"
         fi
-        COLOR_SWATCH_BOX+="<div class=\"$class\" style=\"background-color: $color;"><b>$i</b></div>\n"
+        COLOR_SWATCH_BOX+="<div class=\"$class\" style=\"background-color: $color;\"><b>$i</b></div>\n"
     done
 }
 generate_color_swatch
