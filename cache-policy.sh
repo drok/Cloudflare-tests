@@ -338,6 +338,7 @@ sed --in-place '
     s@_POLICY_IMPOSSIBLE_CLASS_@'"$policy_impossible_class"'@;
     s@_UNBUST_CACHE_TIME_@'"$UNBUST_CACHE_TIME"'@;
     s@_UNBUST_CACHE_SUPPORT_@'"$UNBUST_CACHE_SUPPORT"'@;
+    s@_DEPLOYED_TIME_@'"$NOW"'@;
     s@_SUPPORT_TIME_@'"$support_time"'@;
     ' $output_dir/index.html
 
