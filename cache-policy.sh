@@ -56,11 +56,7 @@ fi
 # Bomb out if any vars are forgotten, declining the deployment
 set -o nounset
 
-if [[ "${GITHUB_ACTIONS:-no}" == true ]] ; then
-    # Just allow the build, GitHub Pages are not rebuilt on cron
-    # because setting headers is not supported; policy can't work.
-    cache_state=0
-elif [[ $is_redeployement == 0 ]] ; then
+if [[ $is_redeployement == 0 ]] ; then
     cache_state=100 # Hotfix-ready
 else
     unset cache_state
@@ -136,7 +132,19 @@ selectSupportAndCacheTime()
 		else
 			idx=0
 		fi
-		cache_time=${cache_times[$idx]:-${cache_times[0]}}
+		if [[ "${GITHUB_ACTIONS:-no}" == true ]] ; then
+			# Github pages does not support custom headers
+			cache_time=0
+		elif [[ "${VERCEL:-no}" == 1 ]] ; then
+			# Vercel does not support headers generated at build time.
+			# Assume the default (0) will be used.
+			# If you set cache time for the entry points in your vercel.json
+			# modify this to use the same value
+			# possibly using $(jq .headers.xxxx vercel.json)
+			cache_time=0
+		else
+			cache_time=${cache_times[$idx]:-${cache_times[0]}}
+		fi
 		support_time=${support_times[$idx]:-${support_times[0]}}
     fi
 
@@ -172,7 +180,6 @@ function date() {
 }
 case $cache_state in
     100)
-            cache_time=$hotfix_cache_time
             hotfix_after=$(date -d "$NOW")
             maintenance_after=$(date -d "$NOW +$hotfix_period_desc")
             stable_after="not before $(date -d "$NOW +$hotfix_period_desc +$maintenance_period_desc")"
@@ -180,7 +187,6 @@ case $cache_state in
             last_deployment=$(date -d "$NOW")
             ;;
     101)
-            cache_time=$maintenance_cache_time
             hotfix_after="ended"
             maintenance_after=$(date -d "$NOW")
             stable_after=$(date -d "$NOW +$maintenance_period_desc")
@@ -188,7 +194,6 @@ case $cache_state in
             last_deployment=$(date -d "$NOW -$time_since_last_deployment seconds")
             ;;
     102)
-            cache_time=$stable_cache_time
             hotfix_after="ended"
             maintenance_after="ended"
             stable_after="now"
@@ -196,7 +201,6 @@ case $cache_state in
             last_deployment=$(date -d "$NOW -$time_since_last_deployment seconds")
             ;;
     0)
-            cache_time="GitHub Pages defaults"
             hotfix_after="n/a"
             maintenance_after="n/a"
             stable_after="n/a"
@@ -333,6 +337,7 @@ sed --in-place '
     s@_POLICY_TABLE_CLASS_@'"$policy_table_class"'@;
     s@_POLICY_IMPOSSIBLE_CLASS_@'"$policy_impossible_class"'@;
     s@_UNBUST_CACHE_TIME_@'"$UNBUST_CACHE_TIME"'@;
+    s@_UNBUST_CACHE_SUPPORT_@'"$UNBUST_CACHE_SUPPORT"'@;
     s@_SUPPORT_TIME_@'"$support_time"'@;
     ' $output_dir/index.html
 
