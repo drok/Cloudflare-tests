@@ -17,8 +17,8 @@
     <div class="text-box">
         This demo of <a href="http://github.com/Archivium/unbust">Archivium cache unbust</a> is re-deployed on a cron job on the 3rd of every month, with:
         <ul>
-            <li><span class="code">UNBUST_CACHE_SUPPORT</span>= "<span class="code">_UNBUST_CACHE_SUPPORT_</span>"</li>
-            <li><span class="code">UNBUST_CACHE_TIME</span>= "<span class="code">_UNBUST_CACHE_TIME_</span>"</li>
+            <li><span class="code">UNBUST_CACHE_SUPPORT=_UNBUST_CACHE_SUPPORT_</span></li>
+            <li><span class="code">UNBUST_CACHE_TIME=_UNBUST_CACHE_TIME_</span></li>
         </ul>
 
         <p>Explanation</p>
@@ -123,6 +123,12 @@
             }
             supportBar.classList.add("progress-animated");
             supportBar.style.animationDuration = `${remainingSupport}s`;
+
+            setTimeout(function() {
+                if (guaranteedFresh) {
+                    window.location.reload();
+                }
+            }, remainingSupport * 1000);
         }
 
         initSupportBar();
@@ -130,10 +136,5 @@
             setReloading(event.target, !guaranteedFresh);
         });
 
-        let timer = setTimeout(function() {
-            if (guaranteedFresh) {
-                window.location.reload();
-            }
-        }, 50000);
 	</script></body>
 </html>
