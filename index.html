@@ -103,7 +103,7 @@
         function initSupportBar() {
             const deployed = new Date("_DEPLOYED_TIME_").getTime() / 1000;
             const endSupport = deployed + _SUPPORT_TIME_ * 86400;
-            var remainingSupport = endSupport - Date.now().getTime() / 1000;
+            var remainingSupport = endSupport - Math.floor(Date.now() / 1000);
             /* If there was no update by the end support, it is overdue, ie, 0 remaining support commitment */
             remainingSupport = Math.max(0, remainingSupport);
             /* At any point in time, the minimum support is the cache time */

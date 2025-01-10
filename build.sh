@@ -26,10 +26,7 @@ deterministic_version() {
 }
 
 pastel_colors=(
-  "#FFC5C5" "#FFB6C1" "#FF99CC" "#FF7FBF" "#FF66B3" "#FF4C9F" "#FF33A1" "#FF1A85"
-  # "#E6DAC3" "#E6C9C5" "#E6B8B8" "#E69FA1" "#E67F8A" "#E65E73" "#E63C5C" "#E61945"
-  # "#C5E1F5" "#C5C9F1" "#C5B3EC" "#C59FE6" "#C577E0" "#C54DDC" "#C43BC8" "#C3A5C4"
-  # "#F7D2C4" "#F2B9A6" "#ECA289" "#E7A17A" "#E4946D" "#E2815F" "#DF6F50" "#DD5C41"
+    "#ffcbc3" "#a1c9f2" "#ffd7be" "#c9e4ca" "#ffe6cc" "#b2e6ce" "#d2b4fc" "#c5cae9"
 )
 
 # Create versioned assets
