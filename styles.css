@@ -26,6 +26,13 @@ h3 {
     margin-top: 5px;
 }
 
+.byline {
+    text-align: center;
+    font-size: 18px; /* smaller than main text */
+    color: #333; /* darker gray */
+    margin-top: 0.25rem; /* add some space from main text */
+}
+
 .text-box {
     width: 700px;
     margin: 40px auto;

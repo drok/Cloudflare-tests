@@ -61,7 +61,9 @@ sed '
 cp $output_dir/styles.v"$version_major".css $output_dir/subdir
 cp favicon.ico $output_dir
 cp dates.html $output_dir
+cp robots.txt $output_dir
 echo "This unversioned file was last generated on $(date) (with v$version_major release)"> $output_dir/subdir/unversioned-file
+echo "This file is cached at CDN edge for 1 minute, in-browser for 5 minutes" > $output_dir/edge-cached-1-minute
 # cp styles.css $output_dir/styles.v"$version_major".css
 
 echo "Generated" > $output_dir/Generated-$FN

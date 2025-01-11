@@ -243,6 +243,9 @@ if [[ "${CF_PAGES:-no}" == 1 ]] ; then
 /subdir/unversioned-file
   Cache-Control: max-age=31536000, must-revalidate
 
+/edge-cached-1-minute
+  Cache-Control: s-maxage=60, max-age=300, immutable
+
 # Unversioned presentation entry-point
 /
   Cache-Control: $entry_point_cache_param
@@ -285,6 +288,11 @@ elif [[ "${NETLIFY:-no}" == true ]] ; then
   [headers.values]
   Cache-Control: max-age=31536000, must-revalidate
 
+[[headers]]
+  for = /edge-cached-1-minute
+  [headers.values]
+  Cache-Control: s-maxage=60, max-age=300, immutable
+
 # Unversioned presentation entry-point
 [[headers]]
   for = /
@@ -310,6 +318,8 @@ elif [[ "${VERCEL:-no}" == 1 ]] ; then
       "headers": [{ "key": "Cache-Control", "value": "max-age=120" }]},
     { "source": "/subdir/unversioned-file",
       "headers": [{ "key": "Cache-Control", "value": "max-age=31536000, must-revalidate" }]},
+    { "source": "/edge-cached-1-minute",
+      "headers": [{ "key": "Cache-Control", "value": "s-maxage=60, max-age=300, immutable" }]},
     { "source": "/",
       "headers": [{ "key": "Cache-Control", "value": "$entry_point_cache_param" }]},
     { "source": "/subdir/",
