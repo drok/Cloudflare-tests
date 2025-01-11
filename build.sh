@@ -63,7 +63,7 @@ sed '
 
 cp $output_dir/styles.v"$version_major".css $output_dir/subdir
 cp favicon.ico $output_dir
-cp dates.html $output_dir
+cp books.png $output_dir
 cp robots.txt $output_dir
 
 cp checkmark.svg $output_dir/edge-cached-1-minute
