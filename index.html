@@ -9,7 +9,7 @@
 </head>
 <body>
     <h1>Unbust demo (release <span class="code">_VERSION_</span>)</h1>
-    <div class="byline"><p>>Cache mode in effect: <span class="code">_CACHE_POLICY_</span></p></div>
+    <div class="byline"><p>Cache mode: <span class="code">_CACHE_POLICY_</span></p></div>
     <div class="progress-bar">
         <div class="progress" id="progress"></div>
         <span class="label" id="freshness">Remaining Support (click to disable auto-reload)</span>
@@ -75,7 +75,10 @@
     <div class="_POLICY_IMPOSSIBLE_CLASS_">
         <p>This deployment environment does not support setting headers. Cache policy not possible.</p>
     </div>
-        <script>
+    <div id="online-status-bar" class="online-status-bar">
+        <span id="online-status-text">You are currently offline</span>
+    </div>    
+    <script>
 		const utcDateElements = document.querySelectorAll('.udate');
 
 		utcDateElements.forEach((element) => {
@@ -152,5 +155,22 @@
             setReloading(event.target, !guaranteedFresh);
         });
 
+        /* Online / offline indicator at the bottom of the page */
+        const onlineStatusBar = document.getElementById('online-status-bar');
+        // const onlineStatusText = document.getElementById('online-status-text');
+
+        function updateOnlineStatus() {
+        if (navigator.onLine) {
+            onlineStatusBar.classList.add('online');
+        } else {
+            onlineStatusBar.classList.remove('online');
+            // onlineStatusText.textContent = 'You are currently offline.';
+        }
+        }
+
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+
+        updateOnlineStatus(); // initial check        
 	</script></body>
 </html>

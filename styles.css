@@ -23,9 +23,10 @@ h2 {
 
 .byline {
     text-align: center;
-    font-size: 18px; /* smaller than main text */
-    color: #333; /* darker gray */
-    margin-top: 0.25rem; /* add some space from main text */
+    font-size: 18px;
+    color: #333;
+    margin-top: 0.15rem;
+    margin-bottom: 0.3rem;
 }
 
 .text-box {
@@ -184,4 +185,21 @@ td {
         /* orange */
     }
 }
-  
+
+.online-status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: #ffff00; /* yellow */
+    color: #000000;
+    padding: 5px;
+    text-align: center;
+    transition: opacity 0.5s;
+    z-index: 1000;
+  }
+
+.online-status-bar.online {
+    background-color: transparent;
+    color: transparent;
+}

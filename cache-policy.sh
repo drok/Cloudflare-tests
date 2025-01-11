@@ -223,8 +223,8 @@ esac
 selectSupportAndCacheTime $cache_state
 
 # ############# Set CDN configuration ############################
-versioned_assets_cache_param="max-age=63072000, immutable"
-entry_point_cache_param="max-age=$cache_time"
+versioned_assets_cache_param="public, max-age=63072000, immutable"
+entry_point_cache_param="public, max-age=$cache_time"
 if [[ "${CF_PAGES:-no}" == 1 ]] ; then
   cat >> $output_dir/_headers <<EOF
 
@@ -237,14 +237,14 @@ if [[ "${CF_PAGES:-no}" == 1 ]] ; then
 
 # This is information, must be timely, minimal cache
 /subdir/*.txt
-  Cache-Control: max-age=120
+  Cache-Control: public, max-age=120
 
 # Unversioned presentation assets
 /subdir/unversioned-file
-  Cache-Control: max-age=31536000, must-revalidate
+  Cache-Control: public, max-age=31536000, must-revalidate
 
 /edge-cached-1-minute/*
-  Cache-Control: s-maxage=60, max-age=300, immutable
+  Cache-Control: public, s-maxage=60, max-age=300, immutable
 
 # Unversioned presentation entry-point
 /
@@ -280,18 +280,18 @@ elif [[ "${NETLIFY:-no}" == true ]] ; then
 [[headers]]
   for = /subdir/*.txt
   [headers.values]
-  Cache-Control: max-age=120
+  Cache-Control: public, max-age=120
 
 # Unversioned presentation assets
 [[headers]]
   for = /subdir/unversioned-file
   [headers.values]
-  Cache-Control: max-age=31536000, must-revalidate
+  Cache-Control: public, max-age=31536000, must-revalidate
 
 [[headers]]
   for = /edge-cached-1-minute/*
   [headers.values]
-  Cache-Control: s-maxage=60, max-age=300, immutable
+  Cache-Control: public, s-maxage=60, max-age=300, immutable
 
 # Unversioned presentation entry-point
 [[headers]]
@@ -315,11 +315,11 @@ elif [[ "${VERCEL:-no}" == 1 ]] ; then
     { "source": "/favicon.ico",
       "headers": [{ "key": "Cache-Control", "value": "$versioned_assets_cache_param" }]},
     { "source": "/subdir/*.txt",
-      "headers": [{ "key": "Cache-Control", "value": "max-age=120" }]},
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=120" }]},
     { "source": "/subdir/unversioned-file",
-      "headers": [{ "key": "Cache-Control", "value": "max-age=31536000, must-revalidate" }]},
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, must-revalidate" }]},
     { "source": "/edge-cached-1-minute/*",
-      "headers": [{ "key": "Cache-Control", "value": "s-maxage=60, max-age=300, immutable" }]},
+      "headers": [{ "key": "Cache-Control", "value": "public, s-maxage=60, max-age=300, immutable" }]},
     { "source": "/",
       "headers": [{ "key": "Cache-Control", "value": "$entry_point_cache_param" }]},
     { "source": "/subdir/",
