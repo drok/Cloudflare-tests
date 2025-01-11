@@ -6,7 +6,6 @@
     <meta name="description" content="See a live demonstration of Archivium's website deployment tool, featuring advanced cache policy management. Learn how to optimize your website's performance and improve user experience." />
     <title>Unbust Offline demo (_VERSION_)</title>
     <link rel="stylesheet" href="_STYLES_FILE_">
-    <link rel="prefetch" href="/offline">
 </head>
 <body>
     <h1>Unbust Offline demo (release <span class="code">_VERSION_</span>)</h1>
@@ -32,7 +31,6 @@
             <li>The versioned assets are served with <span class="code">_VERSIONED_ASSETS_HEADER_</span></li>
             <li>The unversioned entry point <span class="code">index.html</span>'s cache duration is set according to policy (currently <span class="code">_ENTRY_POINT_HEADER_</span>)</li>
             <li><a href="/edge-cached-1-minute/checkmark.svg">The checkmark SVG</a> is cached at the CDN edge for 1 minute, and in-browser for 5 minutes. All other assets are only browser-cached.</li>
-            <li><b>This is an offline demo - turn on airplane mode to see the offline features</b></li>
         </ul>
         The demo is deployed on the following CDNs:
         <ul>
@@ -78,7 +76,7 @@
         <p>This deployment environment does not support setting headers. Cache policy not possible.</p>
     </div>
     <div id="online-status-bar" class="online-status-bar">
-        <span id="online-status-text">You are currently offline. Try some <a href="offline.html">offline content</a>?.</span>
+        <span id="online-status-text">You are currently offline</span>
     </div>    
     <script>
 		const utcDateElements = document.querySelectorAll('.udate');
