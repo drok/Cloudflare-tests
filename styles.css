@@ -204,3 +204,15 @@ td {
     background-color: transparent;
     color: transparent;
 }
+
+.image-container {
+    text-align: center;
+  }
+  
+  .image-container img {
+    display: inline-block;
+    margin: 10px; /* adjust margin as needed */
+    width: 45%; /* adjust width as needed */
+    vertical-align: middle;
+  }
+  
