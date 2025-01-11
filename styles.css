@@ -200,6 +200,7 @@ td {
   }
 
 .online {
+    display: none;
     background-color: transparent;
     color: transparent;
 }
