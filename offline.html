@@ -21,8 +21,8 @@
         <p>The left image should not be available if you navigated to this page without an internet connection.</p>
         <p>The right image is prefetched while online, so it should be available offline.</p>
         <div class="image-container">
-            <img src="/static/books.png" alt="Image of books, not prefetched - should not be available offline">
-            <img src="/static/palmtree.jpg" alt="Image of a palm tree, prefetched while online - should be available offline">
+            <img src="/static/books.png" alt="Image of books, not prefetched - should not be available offline" width="300" height="300">
+            <img src="/static/palmtree.jpg" alt="Image of a palm tree, prefetched while online - should be available offline" width="300" height="300">
         </div>
         <p>The other two demos demonstrate more typical setups, where caching does not accomodate offline use because it requires the browser to re-validate the entry point on navigation.</p>
         <p>See <a href="https://cloudflare-tests.pages.dev" target="_blank">typical cache demo</a> and <a href="https://accelerated.cloudflare-tests.pages.dev" target="_blank">accellerated cache demo</a> as examples.</p>
