@@ -9,7 +9,7 @@
 </head>
 <body>
     <h1>Unbust demo (release <span class="code">_VERSION_</span>)</h1>
-    <div class="byline">Cache mode in effect: <span class="code">_CACHE_POLICY_</span></div>
+    <div class="byline"><p>>Cache mode in effect: <span class="code">_CACHE_POLICY_</span></p></div>
     <div class="progress-bar">
         <div class="progress" id="progress"></div>
         <span class="label" id="freshness">Remaining Support (click to disable auto-reload)</span>
@@ -30,6 +30,7 @@
             <li>A cache policy is implemented in <a href="http://github.com/Archivium/unbust/blob/unbust/demo/cache-policy.sh"><span class="code">cache-policy.sh</span></a>. Based on the above parameters <a href="#policy-schedule">schedule</a> was calculated.</li>
             <li>The versioned assets are served with <span class="code">_VERSIONED_ASSETS_HEADER_</span></li>
             <li>The unversioned entry point <span class="code">index.html</span>'s cache duration is set according to policy (currently <span class="code">_ENTRY_POINT_HEADER_</span>)</li>
+            <li><a href="/edge-cached-1-minute/checkmark.svg">The checkmark SVG</a> is cached at the CDN edge for 1 minute, and in-browser for 5 minutes. All other assets are only browser-cached.</li>
         </ul>
         The demo is deployed on the following CDNs:
         <ul>
