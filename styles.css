@@ -191,15 +191,15 @@ td {
     bottom: 0;
     left: 0;
     width: 100%;
-    background-color: #ffff00; /* yellow */
-    color: #000000;
+    background-color: #ffff0090; /* yellow */
+    color: #000000d0;
     padding: 5px;
     text-align: center;
     transition: opacity 0.5s;
     z-index: 1000;
   }
 
-.online-status-bar.online {
+.online-status-bar .online {
     background-color: transparent;
     color: transparent;
 }
