@@ -48,11 +48,14 @@ generate_color_swatch() {
 }
 generate_color_swatch
 
+entry_points=(index.html offline.html)
+for f in ${entry_points[@]} ; do 
 sed '
     s/_STYLES_FILE_/'styles.v"$version_major".css'/g;
     s/_VERSION_/'v"$version_major"'/g;
     s@_SWATCH_BOX_@'"$COLOR_SWATCH_BOX"'@g;
-    ' <index.html > $output_dir/index.html
+    ' <$f > $output_dir/$f
+done
 
 sed '
     s/_BACKGROUND_COLOR_/'"${pastel_colors[$((version_major % 32))]}"'/g;

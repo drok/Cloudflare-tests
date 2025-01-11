@@ -247,6 +247,23 @@ if [[ "${CF_PAGES:-no}" == 1 ]] ; then
   Cache-Control: public, s-maxage=60, max-age=300, immutable
 
 # Unversioned presentation entry-point
+/*.html
+  Cache-Control: $entry_point_cache_param
+
+EOF
+
+# Cloudflare responds to requests without .html, need to cache them too.
+for f  in ${entry_points[@]} ; do
+  if [[ "$f" == "index.html" ]] ; then
+    continue;
+  fi
+  cat <<EOF
+/$(basename $f)
+  Cache-Control: $entry_point_cache_param
+EOF
+done >> $output_dir/_headers
+
+cat >> $output_dir/_headers <<EOF
 /
   Cache-Control: $entry_point_cache_param
 
@@ -295,6 +312,27 @@ elif [[ "${NETLIFY:-no}" == true ]] ; then
 
 # Unversioned presentation entry-point
 [[headers]]
+  for = /*.html
+  [headers.values]
+  Cache-Control: $entry_point_cache_param
+
+EOF
+
+for f  in ${entry_points[@]} ; do
+  if [[ "$f" == "index.html" ]] ; then
+    continue;
+  fi
+  cat <<EOF
+[[headers]]
+  for = /$(basename $f)
+  [headers.values]
+  Cache-Control: $entry_point_cache_param
+
+EOF
+done >> $output_dir/netlify.toml
+
+cat >> $output_dir/netlify.toml <<EOF
+[[headers]]
   for = /
   [headers.values]
   Cache-Control: $entry_point_cache_param
@@ -320,6 +358,21 @@ elif [[ "${VERCEL:-no}" == 1 ]] ; then
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, must-revalidate" }]},
     { "source": "/edge-cached-1-minute/*",
       "headers": [{ "key": "Cache-Control", "value": "public, s-maxage=60, max-age=300, immutable" }]},
+    { "source": "/*.html",
+      "headers": [{ "key": "Cache-Control", "value": "$entry_point_cache_param" }]},
+EOF
+
+for f  in ${entry_points[@]} ; do
+  if [[ "$f" == "index.html" ]] ; then
+    continue;
+  fi
+  cat <<EOF
+    { "source": "/$(basename $f)",
+      "headers": [{ "key": "Cache-Control", "value": "$entry_point_cache_param" }]},
+EOF
+done >> vercel.json
+
+cat >> vercel.json <<EOF
     { "source": "/",
       "headers": [{ "key": "Cache-Control", "value": "$entry_point_cache_param" }]},
     { "source": "/subdir/",
@@ -336,6 +389,8 @@ fi
 # or set calendar reminders of when the hotfix and maintenance windows close.
 # ie, email/slack/calendar/etc.
 #
+entry_points=(index.html offline.html)
+for f in ${entry_points[@]} ; do 
 sed --in-place '
     s@_CACHE_POLICY_@'"$cache_policy"'@g;
     s@_ENTRY_CACHE_TIME_@'"$cache_time"'@g;
@@ -354,7 +409,8 @@ sed --in-place '
     s@_SUPPORT_TIME_@'"$support_time"'@g;
     s@_VERSIONED_ASSETS_HEADER_@Cache-Control: '"$versioned_assets_cache_param"'@g;
     s@_ENTRY_POINT_HEADER_@Cache-Control: '"$entry_point_cache_param"'@g;
-    ' $output_dir/index.html
+    ' $output_dir/$f
+done
 
 # ############# Return the cache state decision to unbust.sh #############
 exit $cache_state
