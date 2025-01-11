@@ -142,12 +142,22 @@
       var texts;
       line = line.replace(/^\s+|\s+$/g, "");
 
+      // last line, empty
+      if (line === "") {
+        if (currentTask.name) {
+          currentInstance.tasks.push(currentTask);
+          currentTask = {};
+        }
+        continue;
+      }
+
       // 1st line, project name followed by task name
       if (!currentTask.name && !currentTask.group) {
         texts = line.split(",");
         currentTask.type = "task";
-        currentTask.group = texts.slice(0, -1).join(",").trim();
-        currentTask.name = texts.slice(-1).join(",").trim();
+        currentTask.group = texts[0].trim();
+        currentTask.name = texts[1]?.trim();
+        currentTask.url = texts[2]?.trim();
         currentTask.style = currentTask.group.match(/^\*/) ? "bold" : "normal";
         currentTask.group = currentTask.group.replace(/^\*\s+/, "");
         currentTask.color = colors(currentTask.group);
@@ -164,35 +174,24 @@
       }
 
       // next lines, people
-      if (line !== "") {
+      {
         var matches, involvement;
-        matches = line.match(/\s+(\d+)%\s*$/);
+        texts = line.split(",");
+        matches = texts[0].match(/^(\S*)\s*(?:\s+(\d+)%\s*)?(?:,\s*(\S*)\s*)?$/);
 
-        if (matches) {
-          involvement = parseInt(matches[1], 10);
-          line = line.substring(0, line.length - matches[0].length).trim();
-        } else {
-          involvement = 100;
-        }
+        involvement = +matches[2] ? +matches[2] : 100;
 
         currentInstance.people.push({
           type: "people",
-          group: line,
+          group: matches[1],
           from: currentTask.from,
           to: currentTask.to,
           name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
+          url: matches[3],
           taskGroup: currentTask.group,
           color: colors(currentTask.group),
           involvement: involvement
         });
-        continue;
-      }
-
-      // last line, empty
-      if (line === "" && currentTask.name) {
-        currentInstance.tasks.push(currentTask);
-        currentTask = {};
-        continue;
       }
     }
     refresh.apply(currentInstance);
