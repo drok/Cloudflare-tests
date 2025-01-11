@@ -213,6 +213,9 @@ CDN_set_vars()  {
 				local escaped_branch=$(echo $CF_PAGES_BRANCH | sed 's@[^[:alnum:]]@-@g;')
 				BRANCH_URL=$(echo $CF_PAGES_URL | sed -r "s@https://\\w+.@https://$escaped_branch.@")
 			fi
+		else
+			local escaped_branch=$(echo $CF_PAGES_BRANCH | sed 's@[^[:alnum:]]@-@g;')
+			BRANCH_URL=$(echo $CF_PAGES_URL | sed -r "s@https://\\w+.@https://$escaped_branch.@")
 		fi
 		DEPLOYED_AT_URL=$CF_PAGES_URL # This is a deployment-unique url
 
