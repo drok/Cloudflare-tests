@@ -226,9 +226,9 @@ selectSupportAndCacheTime $cache_state
 # Stale while revalidate for 1 month for assets, 2 days for entry points with cache time >= 7 days
 versioned_assets_cache_param="public, max-age=63072000, immutable, stale-while-revalidate=2592000, stale-if-error=31536000"
 if (( $cache_time >= 604800 )); then
-  entry_dpoint_cache_param="public, max-age=$((cache_time - 172800)), cache-while-revalidate=172800, stale-if-error=31536000"
+  entry_point_cache_param="public, max-age=$((cache_time - 172800)), cache-while-revalidate=172800, stale-if-error=31536000"
 else
-  entry_dpoint_cache_param="public, max-age=$cache_time, stale-if-error=31536000"
+  entry_point_cache_param="public, max-age=$cache_time, stale-if-error=31536000"
 fi
 
 if [[ "${CF_PAGES:-no}" == 1 ]] ; then
