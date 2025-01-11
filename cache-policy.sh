@@ -238,6 +238,9 @@ if [[ "${CF_PAGES:-no}" == 1 ]] ; then
 /*.css
   Cache-Control: $versioned_assets_cache_param
 
+/static/*
+  Cache-Control: $versioned_assets_cache_param
+
 /favicon.ico
   Cache-Control: $versioned_assets_cache_param
 
@@ -291,6 +294,11 @@ elif [[ "${NETLIFY:-no}" == true ]] ; then
 # Versioned presentation assets
 [[headers]]
   for = "/*.css"
+  [headers.values]
+  Cache-Control: $versioned_assets_cache_param
+
+[[headers]]
+  for = "/static/*"
   [headers.values]
   Cache-Control: $versioned_assets_cache_param
 
@@ -355,6 +363,8 @@ elif [[ "${VERCEL:-no}" == 1 ]] ; then
 {
   "headers": [
     { "source": "/*.css",
+      "headers": [{ "key": "Cache-Control", "value": "$versioned_assets_cache_param" }]},
+    { "source": "/static/*",
       "headers": [{ "key": "Cache-Control", "value": "$versioned_assets_cache_param" }]},
     { "source": "/favicon.ico",
       "headers": [{ "key": "Cache-Control", "value": "$versioned_assets_cache_param" }]},
