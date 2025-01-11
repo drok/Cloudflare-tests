@@ -16,15 +16,21 @@
     </div>
     <div class="text-box">
         <p>This page was pre-fetched along with its image when the main page was loaded, so it could be pre-cached. This is a trick done to demonstrate that cached content is available offline, which is not typical of websites. Unbust Cache sets the caching headers specifically to allow static content to be available offline.</p>
-        <p>There are to image on this page.</p>
+        <p>There are two image assets used on this page.</p>
         <p>The left image should not be available if you navigated to this page without an internet connection.</p>
-        <p>The right image is prefetched while online, so it should be available offline.</p>
+        <p>The right image is prefetched from the top entry point, so it should be available offline. Normally assets that are essential for the layout/functionality of the site would be prefetched, while images that are "content", such as the image of books would not expected to be available offline.</p>
         <div class="image-container">
-            <img src="/static/books.png" alt="Image of books, not prefetched - should not be available offline" width="300" height="300">
-            <img src="/static/palmtree.jpg" alt="Image of a palm tree, prefetched while online - should be available offline" width="300" height="300">
-        </div>
+            <div class="image-with-caption">
+                <img src="/static/books.png" alt="Image of books, not prefetched - should not be available offline" width="300" height="300">
+                <p class="image-caption">Typical blog content (not pre-fetched)</p>
+            </div>
+            <div class="image-with-caption">
+                <img src="/static/icons.png" alt="Swatch of website icons, prefetched while online - should be available offline" width="300" height="300">
+                <p class="image-caption">Typical web design resources (pre-fetched)</p>
+            </div>
+          </div>        
         <p>The other two demos demonstrate more typical setups, where caching does not accomodate offline use because it requires the browser to re-validate the entry point on navigation.</p>
-        <p>See <a href="https://cloudflare-tests.pages.dev" target="_blank">typical cache demo</a> and <a href="https://accelerated.cloudflare-tests.pages.dev" target="_blank">accelerated cache demo</a> as examples.</p>
+        <p>Go to <a href="/" target="_blank">top page (new tab)</a> or <a href="/">same tab</a>.</p>
     </div>
     <div id="online-status-bar" class="online-status-bar">
         <span id="online-status-text">You are currently offline</span>

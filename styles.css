@@ -206,13 +206,21 @@ td {
 }
 
 .image-container {
+    display: flex;
+    justify-content: center;
+}
+
+.image-with-caption {
+    margin: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.image-caption {
+    font-size: 0.875rem;
+    color: #666;
     text-align: center;
-  }
-  
-  .image-container img {
-    display: inline-block;
-    margin: 10px; /* adjust margin as needed */
-    width: 45%; /* adjust width as needed */
-    vertical-align: middle;
-  }
-  
+    margin-top: 5px;
+    word-wrap: break-word;
+}
