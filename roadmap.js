@@ -159,6 +159,7 @@
         currentTask.group = texts[0].trim();
         currentTask.name = texts[1]?.trim();
         currentTask.url = texts[2]?.trim();
+        currentTask.commit = texts[3]?.trim();
         currentTask.style = currentTask.group.match(/^\*/) ? "bold" : "normal";
         currentTask.group = currentTask.group.replace(/^\*\s+/, "");
         currentTask.color = colors(currentTask.group);
@@ -189,6 +190,7 @@
           name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
           url: matches[3],
           taskGroup: currentTask.group,
+          task: currentTask,
           color: colors(currentTask.group),
           involvement: involvement
         });
@@ -299,7 +301,23 @@
       .attr("fill", "#999")
       .attr("fill-opacity", 0.1);
 
-    // Draw vertical labels
+
+    const html_re = /(\.html)$/;
+    function showState(baseid, commit, url) {
+      var original = document.getElementById(baseid);
+      if (original) {
+        original.src = url;
+        const link = document.getElementById(`${baseid}-url`);
+        if (link) {
+          link.href = url;
+        }
+        const commitspan = document.getElementById(`${baseid}-commit`);
+        if (commitspan) {
+          commitspan.innerText = `${commit.substring(0,7)}`;
+        }
+      }
+    }
+            // Draw vertical labels
     var axisText = svg.append("g")
       .selectAll("text")
       .data(groups)
@@ -450,18 +468,19 @@
       })
       .attr("fill-opacity", 0.5)
       .on("mouseover", function(d) {
-        if (d.url) {
+        if (d.task.url) {
           d3.select(this).style({cursor:"pointer"});
         }
       })
-      .on("click",   function (d, event, other) {
+      .on("click",   function (d) {
           // window.location.href =d.url;
-          if (d.url) {
+          if (d.task.url) {
+            event.stopPropagation();
             if (currentInstance.graphOption.webFrames?.length == 2) {
-              var original = document.getElementById(currentInstance.graphOption.webFrames[0]);
-              if (original) original.src = d.url;
-              var now = document.getElementById(currentInstance.graphOption.webFrames[1]);
-              if (now) now.src = d.url;
+              showState(currentInstance.graphOption.webFrames[0], d.task.commit,
+                  `${d.task.url}/${d.group}`);
+              showState(currentInstance.graphOption.webFrames[1], SOURCE_COMMIT_SHA,
+                  d.group.replace(html_re, `.${d.task.commit.substring(0,7)}$1`));
             } else 
               window.open(d.url, '_blank');
           }

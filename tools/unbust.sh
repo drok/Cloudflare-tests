@@ -363,12 +363,13 @@ deprecation_refill() {
 		sed  "
 			s@_BRANCH_@$BRANCH@g;
 			s@_PROJECT_@$project_name@g;
+			s@_SOURCE_COMMIT_SHA_@$SOURCE_COMMIT_SHA@g;
 			/data-webframes/q;" "$srcdir/diag.html" > "$diagout"
 cat >>"$diagout" <<-EOF
 		${project_name}, ${cur_cache_state_name}, $DEPLOYED_AT_URL
 		$(date +%F) > $(command date --date @$(( NOW + cur_support_time * 24 * 3600 + 2 * cur_cache_time )) +%F)
 EOF
-		find -type f -name "*.html" -printf '%P\n' >>"$diagout"
+		find -type f -name "*.html" ! -name "$diagout" -printf '%P\n' >>"$diagout"
 		echo "" >>"$diagout"
 
 	fi
@@ -452,10 +453,9 @@ EOF
 				# TODO: Cleanup the $BRANCH/$cache_state defaults, they are temporary because teh
 				# existing persist DB was created before the Project: and State: trailers
 				cat >>$diagout <<-EOF
-				${project_name:-$BRANCH}, ${cache_state_name:-$cache_state}, $commit_url, $deploy_sha
-				$(command date --date @$deployment_time +%F) > $(command date --date @$obsolete_time +%F)
-	EOF
-				git show "$commit":files 2>/dev/null | egrep \\.html\$ >> $diagout
+					${project_name:-$BRANCH}, ${cache_state_name:-$cache_state}, $commit_url, $deploy_sha
+					$(command date --date @$deployment_time +%F) > $(command date --date @$obsolete_time +%F)
+				EOF
 			fi
 
 			# Get a list of (deprecated) files that need to be fetched
