@@ -262,7 +262,7 @@ date() {
 }
 
 git() {
-	command git -C "${dbdir}" "$@"
+	command git --no-pager -C "${dbdir}" "$@"
 }
 
 deprecation_setup() {
