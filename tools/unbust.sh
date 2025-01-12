@@ -356,9 +356,13 @@ deprecation_refill() {
 
 		# Calculate if this deployment ($commit) is deprecated or obsolete
 		local cache_state support_time cache_time commit_url deploy_sha trailer
-		while read -r trailer cache_state support_time cache_time deploy_sha unused ; do
+		local a b c d unused
+		while read -r trailer a b c d unused ; do
+			echo "looking at ${trailer,,}"
 			case ${trailer,,} in
-				unbust) break
+				unbust:) cache_state=$a support_time=$b cache_time=$c deploy_sha=$d
+					;;
+				url:) commit_url=$a
 					;;
 				# TODO: recover the commit deployment URL and use it for fetching.
 				# The problem: the last deployed fileset may include files from a newer
@@ -463,7 +467,7 @@ record_caching_state() {
 	local cache_state support_time cache_time commit_url deploy_sha trailer
 	while read -r trailer cache_state support_time cache_time deploy_sha unused ; do
 		case ${trailer,,} in
-			unbust) break
+			unbust:) break
 				;;
 		esac
 	done < <(git show -s --format=format:%B --no-decorate | git interpret-trailers --parse --trim-empty)
