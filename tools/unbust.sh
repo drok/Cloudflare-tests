@@ -219,7 +219,7 @@ CDN_set_vars()  {
 			BRANCH_URL=$(echo $CF_PAGES_URL | sed -r "s@https://\\w+.@https://$escaped_branch.@")
 		fi
 		DEPLOYED_AT_URL=$CF_PAGES_URL # This is a deployment-unique url
-		BRANCH_NAME=$CF_PAGES_BRANCH
+		BRANCH=$CF_PAGES_BRANCH
 
 	# GitHub Pages
 	elif [[ ${GITHUB_ACTIONS:+isset} ]] ; then
