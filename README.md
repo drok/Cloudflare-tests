@@ -62,6 +62,7 @@ The script maintains an encrypted git repository containing records of all deplo
 Required environment variables:
 
   * `UNBUST_CACHE_KEY`: Secret key for encrypting the persistence database
+  * `UNBUST_CACHE_DIAG`: Enable [diagnostics page](#diagnostics)
   * `CF_BUG_756652_WORKAROUND`: Required only on Cloudflare Pages, ([bug 756652](https://community.cloudflare.com/t/branch-alias-url-for-pages-production-env/756652)): two word setting. First word: Production Environemnt branch name, Second word: project URL (at pages.dev). Eg. for this project (`unbust`), the Production branch for the demo site is `unbust/demo`, so the correct setting is `unbust/demo https://unbust.pages.dev`.
 
 Optional settings:
@@ -81,7 +82,7 @@ npm run build && ./tools/unbust.sh dist a7ec317 ./cache-policy.sh
 
 The cache policy script is called with the following arguments:
 
-   `./cache-pollicy.sh <deployment-state> <cache-policy-script> <output-dir>`
+   `./cache-policy.sh <deployment-state> <cache-policy-script> <output-dir> <response-file>`
 
   1. "0" if the currently deployed source commit is the different than the previous deployment, or "1" if it is a repeat deployment
   1. The time in seconds since the previous successful deployment.
@@ -90,6 +91,7 @@ The cache policy script is called with the following arguments:
      same numeric code previously returned by the cache policy script
      (ie, 0 or 100-119)
   1. output directory
+  1. Filename where the policy script is required to write a [response](#policy-response)
 
 When a policy script is used, the *_TIME and *_SUPPORT variables are lists of cache times and support times, one for each policy state, starting with 100. The first value corresponds to policy state 100, the second to 101, and so on.
 
@@ -111,6 +113,49 @@ Example:
     The Maintenance-readiness timing have similar semantics.
 
     On the other hand, once the project reaches Stable state, tabs can remain open for one year, and function reliably, even if in the meanwhile you release new versions. The open tabs will find the now deprecated assets for up to 365 days after the initial release. The long cache time of one month means that an SPA open in a tab will function even offline, as it will be cached on the device, and will not require revalidation for an entire month.
+
+### Policy Response
+
+  The policy script is expected to return with an exit code between 100-119 as described above, and also by writing more detail about the decision to the response file, which is a temporary file created by the `unbust.sh` script.
+
+  The response has the following format:
+
+  ```
+  Unbust Policy Response file v1
+  <Project name, no commas>
+  <policy name, no commas>
+  <support length decided upon, in days> <cache time decided upon for entry points, in seconds> <state duration>
+  ```
+
+  This data is stored by the `unbust.sh` script in the persistence database, and is used to generate the support roadmap on the diagnostics page. It is also used in the decision to obsolete old, versioned resources (eg, `myApp.v[version].css`, etc.). Resources are obsoleted when they have been superseded by another release for at least the `$cache_time * 2`.
+
+  The policy script is normally changed to reflect whether the site should remain in "Stable, but maintained" mode or, on a redesign, changes to a "development/preview" mode. Each commit pushed for deployment can update the policy stance as appropriate. When a redesign is started, the "Project name" might be changed to "Redesign 2030" or similar, for instance. The activity on the diagnostics roadmap will be neatly grouped by project name.
+
+  For example, when a "dev" version is pushed for preview testing, the policy script returns exit code 100, accompanied with the response below. This response communicates that it the push is part of the "Redesign 2030" effort, that it should be marked as "Dev" activity on the roadmap. It is supported for 3 days, and the `*.html` files are cached for 1 day (browsers will auto-reload 3 days after deployment, and every 1 day after that if there is no new re-deployment). The policy-script will automatically advance the project state to "Public-preview" after 14 days if no new pushes are made (ie, the length of the activity bar will be 3 + 1 days). The "state duration" of 14 days is not currently used in `unbust.sh`, but in a future release it may be used to schedule a timed re-deployment to automatically advance the policy state to the next phase (Public-preview, etc):
+
+  ```
+  Unbust Policy Response file v1
+  Redesign 2030
+  Dev
+  3 86400 14
+  ```
+
+The current demo implementation is that the CI/CD uses a cron workflow that runs once a week which attempts to re-deploy. The policy-script has the opportunity, once a week, to auto advance the state, and adopt new caching/auto-reload parameters, or to remain in the same state by rejecting a new deployment (by exiting with error code 1). This "polling" causes the CI/CD logs to be "spammed" with periodic deployment attempts. In a future release, this unnecessary noise can be removed, as well as transitioning the state precisely at the specified time. Until then, you can use the cron parameters to schedule the next attempted run, possibly by updating them in a "pre-commit" hook according to the policy.
+
+## Diagnostics
+
+The `unbust.sh` script can optionally output a diagnostics page by setting the `UNBUST_CACHE_DIAG` environment variable to an html file, for example `diag.html`, which will be created in the output directory.
+
+The diagnostics page shows the website's deployment history as Gantt chart. This chart shows clearly which past deployments are still "supported", ie those deployments for which assets are persisted by the `unbust.sh` script. The chart is interactive, which allows you to compare the original deployment to the present look.
+
+The left pane of the display is the commit deployment (eg, "`https://<commit>.<project>.pages.dev`" or the equivalent commit URL for the supported CDN), and the right side shows the current state of that same commit, updated with any subsequent deployments (ie, `https://my-domain.com/index.<commit>.html`). The right side is the same HTML file originally published, but rendered with (current, updated) sub-resources.
+
+The point is to see if recent deployments have broken the experience of visitors who have the old version of the website loaded in their browsers.
+
+The two sides should look identical. Any differences are due to build bugs. If your build scripts make breaking changes to resources without using a versioned filename, they break existing open tabs. It's a relatively simple mistake to avoid, but difficult to recognize when it happens. The diagnosis page makes detection simple.
+
+**NOTE**: The diagnostic page uses IFRAMES to load two URLs from different domains side by side. If your site uses the 'Content-Security-Policy' header to prevent embedding it into third party sites, you will need to add that header now, to allow the site at `my-domain.com` to load the URL from `*.pages.dev` or your respective CI/CD infrastructure.
+
 
 ## CDN support
 

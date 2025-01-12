@@ -353,7 +353,24 @@ deprecation_refill() {
 	local diagout
 
 	if [[ ${UNBUST_CACHE_DIAG:+isset} ]] ; then
-		diagout=$(mktemp)
+		# FIXME: If no cache-policy script is given, there is no project_name or cache_state_name
+
+		if [[ "$UNBUST_CACHE_DIAG" =~ \.html$ ]] ; then
+			diagout="${UNBUST_CACHE_DIAG}"
+		else
+			diagout="diag.html"
+		fi
+		sed  "
+			s@_BRANCH_@$BRANCH@g;
+			s@_PROJECT_@$project_name@g;
+			/data-webframes/q;" "$srcdir/diag.html" > "$diagout"
+cat >>"$diagout" <<-EOF
+		${project_name}, ${cur_cache_state_name}, $DEPLOYED_AT_URL
+		$(date +%F) > $(command date --date @$(( NOW + cur_support_time * 24 * 3600 + 2 * cur_cache_time )) +%F)
+EOF
+		find -type f -name "*.html" -printf '%P\n' >>"$diagout"
+		echo "" >>"$diagout"
+
 	fi
 
 	echo "#   Deprecated files:"
@@ -367,10 +384,17 @@ deprecation_refill() {
 
 		# Calculate if this deployment ($commit) is deprecated or obsolete
 		local cache_state support_time cache_time commit_url deploy_sha trailer
+		local project_name cache_state_name
 		local a b c d unused
 		while read -r trailer a b c d unused ; do
 			echo "looking at ${trailer,,}"
 			case ${trailer,,} in
+				project:) project_name=($a $b $c $d $unused)
+						project_name="${project_name[*]}"
+						;;
+				state:) cache_state_name=($a $b $c $d $unused)
+						cache_state_name="${cache_state_name[*]}"
+						;;
 				unbust:) cache_state=$a support_time=$b cache_time=$c deploy_sha=$d
 					;;
 				url:) commit_url=$a
@@ -422,40 +446,45 @@ deprecation_refill() {
 		# low watermark - the earliest useful deployment commit
 		trim_cutoff=$commit
 
-		if [[ ${diagout:+isset} ]] ; then
-			cat >>$diagout <<-EOF
-			Branch $BRANCH, $cache_state, $commit_url, $deploy_sha
-			$(command date --date @$deployment_time +%F) > $(command date --date @$replacement_time +%F)
-EOF
-			git show "$commit":files 2>/dev/null | egrep \\.html\$ >> $diagout
-		fi
-
-		# Get a list of (deprecated) files that need to be fetched
-		while read -r file ; do
-			# Make a list of files to be preserved from the branch URL
-			if [ ! -e "$file" ] ; then
-				echo "$file"
+		# If it has "files"
+		if git show "$commit":files >/dev/null 2>&1 ; then
+			if [[ ${diagout:+isset} ]] ; then
+				# TODO: Cleanup the $BRANCH/$cache_state defaults, they are temporary because teh
+				# existing persist DB was created before the Project: and State: trailers
+				cat >>$diagout <<-EOF
+				${project_name:-$BRANCH}, ${cache_state_name:-$cache_state}, $commit_url, $deploy_sha
+				$(command date --date @$deployment_time +%F) > $(command date --date @$obsolete_time +%F)
+	EOF
+				git show "$commit":files 2>/dev/null | egrep \\.html\$ >> $diagout
 			fi
 
-			local diagfile
-			# Fetch diagnostic entry points from the commit URL
-			if [[ ${diagout:+isset} && "$file" =~ .*\.html$ ]] ; then
-				echo "$file" >> $diagout
-				diagfile=${file/%.html/.${deploy_sha::7}.html}
-				if [ ! -e "$diagfile" ] ; then
-					if ! wget --cut-dirs=$urldepth--retry-connrefused --force-directories --no-host-directories "$commit_url/$file" -O "$diagfile" -o "$wgetlog" &&
-						! wget --cut-dirs=$urldepth--retry-connrefused --force-directories --no-host-directories "$dburl/$diagfile" -O "$diagfile" -a "$wgetlog" ; then
-						>&2 echo "# ##########################################################"
-						>&2 echo "# #  Failed to fetch diag file: $commit_url/$file"
-						>&2 echo "# ##########################################################"
-						>&2 cat $wgetlog
-						>&2 echo "# ##########################################################"
-						return 1
+			# Get a list of (deprecated) files that need to be fetched
+			while read -r file ; do
+				# Make a list of files to be preserved from the branch URL
+				if [ ! -e "$file" ] ; then
+					echo "$file"
+				fi
+
+				local diagfile
+				# Fetch diagnostic entry points from the commit URL
+				if [[ ${diagout:+isset} && "$file" =~ .*\.html$ ]] ; then
+					echo "$file" >> $diagout
+					diagfile=${file/%.html/.${deploy_sha::7}.html}
+					if [ ! -e "$diagfile" ] ; then
+						if ! wget --cut-dirs=$urldepth--retry-connrefused --force-directories --no-host-directories "$commit_url/$file" -O "$diagfile" -o "$wgetlog" &&
+							! wget --cut-dirs=$urldepth--retry-connrefused --force-directories --no-host-directories "$dburl/$diagfile" -O "$diagfile" -a "$wgetlog" ; then
+							>&2 echo "# ##########################################################"
+							>&2 echo "# #  Failed to fetch diag file: $commit_url/$file"
+							>&2 echo "# ##########################################################"
+							>&2 cat $wgetlog
+							>&2 echo "# ##########################################################"
+							return 1
+						fi
 					fi
 				fi
-			fi
-		done < <(git show "$commit":files 2>/dev/null || :)  >$list
-		echo "" >> $diagout
+			done < <(git show "$commit":files) >$list
+			echo "" >> $diagout
+		fi
 
 		replacement_time=$deployment_time
 
@@ -504,8 +533,8 @@ EOF
 	# trim_cutoff=7d44daff589c6a557f9c6d26a4bd49e3d73031f1
 	if [[ ${trim_cutoff:+isset} ]] ; then echo $trim_cutoff > $dbdir/.git/shallow ; fi
 	rm -f $wgetlog $list
-	if [[ ${UNBUST_CACHE_DIAG:+isset} ]] ; then
-		rm -f $diagout
+	if [[ ${diagout:+isset} ]] ; then
+		sed -n -e '/END-OF-DATA/,$p' "$srcdir/diag.html" >>$diagout
 	fi
 
 }
@@ -541,20 +570,29 @@ record_caching_state() {
 	fi
 
 	pushd >/dev/null
-	$cache_logic_script $is_redeployement $last_commit_time ${cache_state:-0} "$outdir" && cache_state=$? || cache_state=$?
+	local policy_response=$(mktemp)
+	$cache_logic_script $is_redeployement $last_commit_time ${cache_state:-0} "$outdir" "$policy_response" && cache_state=$? || cache_state=$?
 	pushd >/dev/null
 
 	if (( cache_state == 0 || (cache_state >= 100 && cache_state < 119) )) ; then
-		local idx
-		if [[ $cache_state != 0 ]] ; then
-			idx=$((cache_state - 100))
-		else
-			idx=0
-		fi
-		local cache_time=${cache_times[$idx]:-${cache_times[0]}}
-		local support_time=${support_times[$idx]:-${support_times[0]}}
+		# Read policy response
+		# vars are declared in the caller, and also used in deprecation_refill
+		# to update the diag file
+		{
+			local magic
+			read -r magic
+			[[ "$magic" == "Unbust Policy Response file v1" ]] || {
+				>&2 echo "ERROR: Policy response format not supported."
+				exit 1
+			}
+			read -r project_name
+			read -r cur_cache_state_name
+			read -r cur_support_time cur_cache_time cur_phase_time
+		} < "$policy_response"
 		trailers+=(
-			--trailer "Unbust: $cache_state $support_time $cache_time $SOURCE_COMMIT_SHA"
+			--trailer "Project: $project_name"
+			--trailer "State: $cur_cache_state_name"
+			--trailer "Unbust: $cache_state $cur_support_time $cur_cache_time $SOURCE_COMMIT_SHA"
 			--trailer "Url: $DEPLOYED_AT_URL"
 		)
 
@@ -571,6 +609,7 @@ record_caching_state() {
 		>&2 echo "ERROR: Cache policy script $cache_logic_script failed ($cache_state)."
 		exit 1
 	fi
+	rm -f "$policy_response"
 }
 
 # Implentation choices
@@ -600,9 +639,12 @@ deprecation_track() {
 		last_commit_time=$(git --no-pager log -1 --format=%at)
 	fi
 
-	if [[ ${last_commit_time:+isset} ]] ; then
-		record_caching_state "$cache_logic_script" "$((NOW - last_commit_time))" "$outdir"
-	fi
+	# Declared here and shared between record_caching_state and deprecation_refill
+	# cur_ means currently decided by policy
+	local project_name cur_cache_state_name
+	local cur_cache_time cur_support_time cur_phase_time
+
+	record_caching_state "$cache_logic_script" "$((NOW - last_commit_time))" "$outdir"
 
 	if [[ ${#trailers[@]} -gt 0 ]] ; then
 		msg=$(echo "$msg" | git interpret-trailers "${trailers[@]}")
@@ -709,6 +751,7 @@ if [[ $# -ge 3 ]] ; then
 fi
 
 pushd "$1" >/dev/null
+srcdir=$OLDPWD
 
 INITIAL_COMMIT_SHA="$2"
 

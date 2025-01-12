@@ -63,6 +63,7 @@ sed '
 
 cp $output_dir/styles.v"$version_major".css $output_dir/subdir
 cp favicon.ico $output_dir
+cp roadmap.js $output_dir
 cp -a static $output_dir
 cp robots.txt $output_dir
 
