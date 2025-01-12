@@ -59,6 +59,7 @@
           type: this.getAttribute("data-graph-type"),
           dateFormat:this.getAttribute("data-graph-date-format"),
           ticksType: this.getAttribute('data-graph-ticks'),
+          webFrames: this.getAttribute('data-webframes')?.split(' '),
           additionalXAxis: this.getAttribute('data-graph-additional-xaxis') === "true"
         },
         node: this
@@ -325,7 +326,13 @@
       })
       .on("click",   function (d) {
         if (d.url) {
-          window.location.href =d.url;
+          if (currentInstance.graphOption.webFrames?.length == 2) {
+            var original = document.getElementById(currentInstance.graphOption.webFrames[0]);
+            if (original) original.src = d.url;
+            var now = document.getElementById(currentInstance.graphOption.webFrames[1]);
+            if (now) now.src = d.url;
+          } else
+            window.location.href = d.url;
         } else if (d.type === "task") {
           refresh.apply(currentInstance, [d.name, this.getBBox().y]);
         }
@@ -450,7 +457,13 @@
       .on("click",   function (d, event, other) {
           // window.location.href =d.url;
           if (d.url) {
-            window.open(d.url, '_blank');
+            if (currentInstance.graphOption.webFrames?.length == 2) {
+              var original = document.getElementById(currentInstance.graphOption.webFrames[0]);
+              if (original) original.src = d.url;
+              var now = document.getElementById(currentInstance.graphOption.webFrames[1]);
+              if (now) now.src = d.url;
+            } else 
+              window.open(d.url, '_blank');
           }
       });
 
