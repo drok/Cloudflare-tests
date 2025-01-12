@@ -190,6 +190,7 @@ set -o nounset
 # - BRANCH_URL          - The URL where the branch is deployed
 #                         Note: For Cloudflare, this must be set in the
 #						  calling environment. It cannot be detected
+# - BRANCH				- Branch name
 CDN_set_vars()  {
 
 	# Cloudflare Pages
@@ -218,6 +219,7 @@ CDN_set_vars()  {
 			BRANCH_URL=$(echo $CF_PAGES_URL | sed -r "s@https://\\w+.@https://$escaped_branch.@")
 		fi
 		DEPLOYED_AT_URL=$CF_PAGES_URL # This is a deployment-unique url
+		BRANCH_NAME=$CF_PAGES_BRANCH
 
 	# GitHub Pages
 	elif [[ ${GITHUB_ACTIONS:+isset} ]] ; then
@@ -225,6 +227,7 @@ CDN_set_vars()  {
 		SOURCE_COMMIT_SHA=${GITHUB_SHA::12}
 		BRANCH_URL=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.html_url')
 		DEPLOYED_AT_URL=$BRANCH_URL
+		BRANCH=$GITHUB_REF
 	
 	# Netlify
 	elif [[ ${NETLIFY:+isset} ]] ; then
@@ -232,6 +235,7 @@ CDN_set_vars()  {
 		SOURCE_COMMIT_SHA=${COMMIT_REF::12}
 		BRANCH_URL=$DEPLOY_PRIME_URL
 		DEPLOYED_AT_URL=$DEPLOY_URL
+		# BRANCH is already set by Netfly
 
 	# Vercel
 	elif [[ ${VERCEL:+isset} ]] ; then
@@ -239,6 +243,7 @@ CDN_set_vars()  {
 		SOURCE_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA::12}
 		BRANCH_URL=https://$VERCEL_BRANCH_URL
 		DEPLOYED_AT_URL=$BRANCH_URL
+		BRANCH=$VERCEL_GIT_COMMIT_REF
 	else
 		>&2 echo "ERROR: This CDN is not yet supported."
 		return 1
@@ -345,6 +350,12 @@ deprecation_refill() {
 #		return 0
 #	fi
 
+	local diagout
+
+	if [[ ${UNBUST_CACHE_DIAG:+isset} ]] ; then
+		diagout=$(mktemp)
+	fi
+
 	echo "#   Deprecated files:"
 	echo "#   -----------------------------------------------------------"
 
@@ -386,17 +397,46 @@ deprecation_refill() {
 			replacement_time=$deployment_time
 			continue
 		fi
-		replacement_time=$deployment_time
 
 		# low watermark - the earliest useful deployment commit
 		trim_cutoff=$commit
 
+		if [[ ${diagout:+isset} ]] ; then
+			cat >>$diagout <<-EOF
+			Branch $BRANCH, $cache_state, $commit_url, $deploy_sha
+			$(command date --date @$deployment_time +%F) > $(command date --date @$replacement_time +%F)
+EOF
+			git show "$commit":files 2>/dev/null | egrep \\.html\$ >> $diagout
+		fi
+
 		# Get a list of (deprecated) files that need to be fetched
 		while read -r file ; do
+			# Make a list of files to be preserved from the branch URL
 			if [ ! -e "$file" ] ; then
 				echo "$file"
 			fi
+
+			local diagfile
+			# Fetch diagnostic entry points from the commit URL
+			if [[ ${diagout:+isset} && "$file" =~ .*\.html$ ]] ; then
+				echo "$file" >> $diagout
+				diagfile=${file/%.html/.${deploy_sha::7}.html}
+				if [ ! -e "$diagfile" ] ; then
+					if ! wget --cut-dirs=$urldepth--retry-connrefused --force-directories --no-host-directories "$commit_url/$file" -O "$diagfile" -o "$wgetlog" &&
+						! wget --cut-dirs=$urldepth--retry-connrefused --force-directories --no-host-directories "$dburl/$diagfile" -O "$diagfile" -a "$wgetlog" ; then
+						>&2 echo "# ##########################################################"
+						>&2 echo "# #  Failed to fetch diag file: $commit_url/$file"
+						>&2 echo "# ##########################################################"
+						>&2 cat $wgetlog
+						>&2 echo "# ##########################################################"
+						return 1
+					fi
+				fi
+			fi
 		done < <(git show "$commit":files 2>/dev/null || :)  >$list
+		echo "" >> $diagout
+
+		replacement_time=$deployment_time
 
 		if [ -s "$list" ] ; then
 
@@ -443,6 +483,10 @@ deprecation_refill() {
 	# trim_cutoff=7d44daff589c6a557f9c6d26a4bd49e3d73031f1
 	if [[ ${trim_cutoff:+isset} ]] ; then echo $trim_cutoff > $dbdir/.git/shallow ; fi
 	rm -f $wgetlog $list
+	if [[ ${UNBUST_CACHE_DIAG:+isset} ]] ; then
+		rm -f $diagout
+	fi
+
 }
 
 sitestats() {
