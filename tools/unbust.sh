@@ -388,12 +388,33 @@ deprecation_refill() {
 			esac
 		done < <(git show -s --format=format:%B --no-decorate $commit | git interpret-trailers --parse --trim-empty)
 
-		# This deployment commit is supported the next/replacement deployment is less than
-		# $cache_time old (ie, the cached entry-point is still valid),
+#		git show -s --format=format:%B --no-decorate $commit
+		# This deployment commit is supported if the next/replacement deployment is less than
+		# 2*$cache_time old (ie, the cached entry-point is still valid),
 		# or the deployment time is less than $support_time old (ie, open tabs still need it)
+		#
+		# 2 * cache_time means: After end of support, after replacement was deployed, browser
+		# fetches a copy from edge, which is up to "cache_time" out-of-date,
+		# and uses it for another "cache_time", meaning the browser will access resources for
+		# the replaced deployment up to 2 * cache_time after the deployment.
 
 		deployment_time=$(git show -s --format=%at $commit)
-		if (( NOW - replacement_time >= cache_time || NOW - deployment_time >= (support_time * 24 * 3600) )) ; then
+#		if (( NOW - replacement_time >= (2 * cache_time) )) ; then
+#			echo "______________ Commit $commit is obsolete because $NOW - $replacement_time > 2 * $cache_time (out of cache)"
+#		fi
+#		if (( NOW - deployment_time >= (support_time * 24 * 3600) )) ; then
+#			echo "______________ Commit $commit is obsolete because $NOW - $deployment_time > $support_time days (out of support)"
+#		fi
+
+		local end_of_support last_cache_read obsolete_time
+		end_of_support=$(( deployment_time + support_time * 24 * 3600 ))
+		last_cache_read=$(( replacement_time + 2 * cache_time ))
+		if (( end_of_support > last_cache_read )) ; then
+			obsolete_time=$end_of_support
+		else
+			obsolete_time=$last_cache_read
+		fi
+		if (( NOW >= obsolete_time )) ; then
 			replacement_time=$deployment_time
 			continue
 		fi
