@@ -176,10 +176,9 @@
       // next lines, people
       {
         var matches, involvement;
-        texts = line.split(",");
-        matches = texts[0].match(/^(\S*)\s*(?:\s+(\d+)%\s*)?(?:,\s*(\S*)\s*)?$/);
+        matches = line.match(/^\s*(\S*)\s*(?:\s+(\d+)%\s*)?(?:,\s*(\S*)\s*)?$/);
 
-        involvement = +matches[2] ? +matches[2] : 100;
+        involvement = matches[2] ? +matches[2] : 100;
 
         currentInstance.people.push({
           type: "people",
@@ -251,7 +250,7 @@
           j++;
         }
         groups.push({
-          type: "group",
+          type: items[i].type,
           name: items[i].group,
           count: count,
           previous: total,
@@ -318,7 +317,20 @@
       })
       .attr("text-anchor", "start")
       .attr("text-height", 14)
-      .attr("fill", "#000");
+      .attr("fill", "#000")
+      .on("mouseover", function(d) {
+        if (d.type === "task" || (d.type === "people" && d.url)) {
+          d3.select(this).style({cursor:"pointer"});
+        }
+      })
+      .on("click",   function (d) {
+        if (d.url) {
+          window.location.href =d.url;
+        } else if (d.type === "task") {
+          refresh.apply(currentInstance, [d.name, this.getBBox().y]);
+        }
+      });
+
 
     var sidePadding = options.sidePadding || axisText[0].parentNode.getBBox().width + 15;
 
@@ -430,11 +442,16 @@
         return d.pattern || d.color;
       })
       .attr("fill-opacity", 0.5)
-      .on("mouseover", function() {
-        d3.select(this).style({cursor:"pointer"});
+      .on("mouseover", function(d) {
+        if (d.url) {
+          d3.select(this).style({cursor:"pointer"});
+        }
       })
-      .on("click",   function (d) {
-        refresh.apply(currentInstance, [getGroupName(d), this.getBBox().y]);
+      .on("click",   function (d, event, other) {
+          // window.location.href =d.url;
+          if (d.url) {
+            window.open(d.url, '_blank');
+          }
       });
 
     // Draw items texts
@@ -531,17 +548,6 @@
       svg: svg
     };
   };
-
-  function getGroupName(d) {
-    switch (d.type) {
-      case "people":
-        return d.taskGroup;
-      case "task":
-        return d.group;
-      case "group":
-        return d.name;
-    }
-  }
 
   document.addEventListener("DOMContentLoaded", function(){
     if(typeof window.__isRoadmapLoaded === "undefined") {
