@@ -366,7 +366,7 @@ deprecation_refill() {
 			s@_SOURCE_COMMIT_SHA_@$SOURCE_COMMIT_SHA@g;
 			/data-webframes/q;" "$srcdir/diag.html" > "$diagout"
 cat >>"$diagout" <<-EOF
-		${project_name}, ${cur_cache_state_name}, $DEPLOYED_AT_URL
+		${project_name}, ${cur_cache_state_name}, $DEPLOYED_AT_URL, $SOURCE_COMMIT_SHA
 		$(date +%F) > $(command date --date @$(( NOW + cur_support_time * 24 * 3600 + 2 * cur_cache_time )) +%F)
 EOF
 		find -type f -name "*.html" ! -name "$diagout" -printf '%P\n' >>"$diagout"
