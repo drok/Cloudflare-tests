@@ -160,6 +160,8 @@
         currentTask.name = texts[1]?.trim();
         currentTask.url = texts[2]?.trim();
         currentTask.commit = texts[3]?.trim();
+        if (currentInstance.tasks.length)
+            currentInstance.tasks[currentInstance.tasks.length - 1].prev = currentTask;
         currentTask.style = currentTask.group.match(/^\*/) ? "bold" : "normal";
         currentTask.group = currentTask.group.replace(/^\*\s+/, "");
         currentTask.color = colors(currentTask.group);
@@ -187,7 +189,7 @@
           group: matches[1],
           from: currentTask.from,
           to: currentTask.to,
-          name: currentTask.name !== '' ? currentTask.group + " — " + currentTask.name : currentTask.group,
+          name: currentTask.name !== '' ? currentTask.name : currentTask.group,
           url: matches[3],
           taskGroup: currentTask.group,
           task: currentTask,
@@ -303,18 +305,28 @@
 
 
     const html_re = /(\.html)$/;
-    function showState(baseid, commit, url) {
+    function showState(baseid, commit, url, description, look, person) {
       var original = document.getElementById(baseid);
       if (original) {
-        original.src = url;
+        if (url)
+          original.src = url;
+        else
+          original.removeAttribute('src')
         const link = document.getElementById(`${baseid}-url`);
         if (link) {
-          link.href = url;
+          if (url) {
+            link.href = url;
+          } else {
+            link.removeAttribute('href');
+          }
+          link.innerText = description;
         }
         const commitspan = document.getElementById(`${baseid}-commit`);
-        if (commitspan) {
-          commitspan.innerText = `${commit.substring(0,7)}`;
-        }
+        if (commitspan) commitspan.innerText = `${commit.substring(0,7)}`;
+        const what = document.getElementById(`${baseid}-what`);
+        if (what) what.innerText = person;
+        const lookspan = document.getElementById(`${baseid}-look`);
+        if (lookspan) lookspan.innerText = look;
       }
     }
             // Draw vertical labels
@@ -338,23 +350,26 @@
       .attr("text-height", 14)
       .attr("fill", "#000")
       .on("mouseover", function(d) {
-        if (d.type === "task" || (d.type === "people" && d.url)) {
+        if (d.type === "task" || (d.type === "people" && d.task.url)) {
           d3.select(this).style({cursor:"pointer"});
         }
       })
       .on("click",   function (d) {
-        if (d.url) {
+        if (d.type === "task" && d.url) {
           if (currentInstance.graphOption.webFrames?.length == 2) {
-            var original = document.getElementById(currentInstance.graphOption.webFrames[0]);
-            if (original) original.src = d.url;
-            var now = document.getElementById(currentInstance.graphOption.webFrames[1]);
-            if (now) now.src = d.url;
+            event.stopPropagation();
+            if (currentInstance.graphOption.webFrames?.length == 2) {
+              showState(currentInstance.graphOption.webFrames[0], d.commit,
+                  `${d.url}/`);
+              showState(currentInstance.graphOption.webFrames[1], SOURCE_COMMIT_SHA,
+                  `index.${d.commit.substring(0,7)}.html`);
           } else
             window.location.href = d.url;
         } else if (d.type === "task") {
           refresh.apply(currentInstance, [d.name, this.getBBox().y]);
         }
-      });
+      }
+    });
 
 
     var sidePadding = options.sidePadding || axisText[0].parentNode.getBBox().width + 15;
@@ -468,19 +483,47 @@
       })
       .attr("fill-opacity", 0.5)
       .on("mouseover", function(d) {
-        if (d.task.url) {
+        if (d.url || d.task?.url) {
           d3.select(this).style({cursor:"pointer"});
         }
       })
       .on("click",   function (d) {
           // window.location.href =d.url;
-          if (d.task.url) {
-            event.stopPropagation();
+          event.stopPropagation();
+          if (d.url) {
+            /* click on the task under a project */
             if (currentInstance.graphOption.webFrames?.length == 2) {
-              showState(currentInstance.graphOption.webFrames[0], d.task.commit,
-                  `${d.task.url}/${d.group}`);
+              if (!d.prev)
+                showState(currentInstance.graphOption.webFrames[0], "",
+                  null,
+                "Previously", "did not exist", "the entry point /");
+              else
+                showState(currentInstance.graphOption.webFrames[0], d.commit,
+                    `index.${d.prev.commit.substring(0,7)}.html`,
+                  "Previously", "looked", "the entry point /");
+
               showState(currentInstance.graphOption.webFrames[1], SOURCE_COMMIT_SHA,
-                  d.group.replace(html_re, `.${d.task.commit.substring(0,7)}$1`));
+                  '.',
+                "Now", "looks", "the entry point /");
+              }
+          } else
+          if (d.task.url) {
+            /* click on file/person rectangle */
+            if (currentInstance.graphOption.webFrames?.length == 2) {
+              if (d.task.commit == SOURCE_COMMIT_SHA) {
+                showState(currentInstance.graphOption.webFrames[0], d.task.prev.commit,
+                  d.group.replace(html_re, `.${d.task.prev.commit.substring(0,7)}$1`),
+                  "The previous version", "will now look", d.group);
+              } else {
+                showState(currentInstance.graphOption.webFrames[0], d.task.commit,
+                    `${d.task.url}/${d.group}`,
+                  "When published", "looked", d.group);
+              }
+              showState(currentInstance.graphOption.webFrames[1], SOURCE_COMMIT_SHA,
+                  (d.task.commit == SOURCE_COMMIT_SHA) ?
+                    `${d.group}` :
+                    d.group.replace(html_re, `.${d.task.commit.substring(0,7)}$1`),
+                  "Now", "looks", "it");
             } else 
               window.open(d.url, '_blank');
           }
