@@ -15,8 +15,8 @@
 set -x
 set -o errexit
 
-[[ $# -eq 4 ]] || {
-    echo "Usage: $0 <is_redeployement> <time_since_last_deployment> <last_cache_state> <output_dir>";
+[[ $# -eq 5 ]] || {
+    echo "Usage: $0 <is_redeployement> <time_since_last_deployment> <last_cache_state> <output_dir> <response_file>";
     exit 1;
 }
 
@@ -24,6 +24,7 @@ is_redeployement=$1
 time_since_last_deployment=$2
 last_cache_state=$3
 output_dir=$4
+response_file=$5
 
 [[ ${UNBUST_CACHE_SUPPORT:+isset} ]] || {
 	UNBUST_CACHE_SUPPORT=90 # 3 months.
@@ -34,6 +35,8 @@ output_dir=$4
 }
 
 # ############# Policy choices ############################
+project_name="Diag Demo v1"
+
 hotfix_period=$((3600 * 24 * 7))
 hotfix_period_desc="1 week"
 
@@ -58,37 +61,37 @@ set -o nounset
 
 if [[ $is_redeployement == 0 ]] ; then
     cache_state=100 # Hotfix-ready
+    state_duration=$hotfix_period
 else
     unset cache_state
     case $last_cache_state in
-        100)        if (( time_since_last_deployment < hotfix_period )) ; then
+        100)
+                    if (( time_since_last_deployment <= hotfix_period )) ; then
                         exit 1
-                    elif (( time_since_last_deployment < maintenance_period )) ; then
+                    elif (( time_since_last_deployment <= maintenance_period )) ; then
                         cache_state=101
                     fi
                     ;;
-        101)        if (( time_since_last_deployment < maintenance_period )) ; then
+        101)
+                    if (( time_since_last_deployment <= maintenance_period )) ; then
                         exit 1
                     fi
                     ;;
         102)        exit 1 # stay stable.
                     ;;
         initial|*)  # Cover the case where the previous commit's cache policy implemented different states
-                    if [[ "${GITHUB_ACTIONS:-no}" == true ]] ; then
-                        # Just allow the build, GitHub Pages are not rebuilt on cron
-                        # because setting headers is not supported; policy can't work.
-                        cache_state=0
-                    elif (( time_since_last_deployment < hotfix_period )) ; then
+                    if (( time_since_last_deployment < hotfix_period )) ; then
                         cache_state=100
-                    elif (( time_since_last_deployment < maintenance_period )) ; then
+                    elif (( time_since_last_deployment <= maintenance_period )) ; then
                         cache_state=101
-                        hotfix_after="ended"
-                        maintenance_after=$(date -d "+$maintenance_period_desc -$time_since_last_deployment seconds")
-                        cache_policy="Maintenance-ready"
                     fi
                     ;;
     esac
     if [[ ! ${cache_state:+isset} ]] ; then
+        # Skip to stable if it has been a really long time (ie, no deployments during maintenance period)
+        # This can happen if the CDN has an outage when GitHub attempts a cron DEPLOY_HOOK run for maintenance.
+        # The dev would typically trigger the hook manually some time later. Depending how much later,
+        # The "maintenance" work was done while the site was in extended "hotfix" mode
         cache_state=102
     fi
 fi
@@ -185,6 +188,7 @@ case $cache_state in
             stable_after="not before $(date -d "$NOW +$hotfix_period_desc +$maintenance_period_desc")"
             cache_policy="Hotfix-ready"
             last_deployment=$(date -d "$NOW")
+            state_duration=$hotfix_period
             ;;
     101)
             hotfix_after="ended"
@@ -192,6 +196,7 @@ case $cache_state in
             stable_after=$(date -d "$NOW +$maintenance_period_desc")
             cache_policy="Maintenance-ready"
             last_deployment=$(date -d "$NOW -$time_since_last_deployment seconds")
+            state_duration=$maintenance_period
             ;;
     102)
             hotfix_after="ended"
@@ -199,6 +204,7 @@ case $cache_state in
             stable_after="now"
             cache_policy="Stable"
             last_deployment=$(date -d "$NOW -$time_since_last_deployment seconds")
+            state_duration=${UNBUST_CACHE_SUPPORT[2]:-$UNBUST_CACHE_SUPPORT[0]}
             ;;
     0)
             hotfix_after="n/a"
@@ -206,6 +212,7 @@ case $cache_state in
             stable_after="n/a"
             cache_policy="n/a"
             last_deployment=$(date -d "$NOW")
+            state_duration=$hotfix_period
             ;;
 esac
 
@@ -222,6 +229,13 @@ esac
 
 selectSupportAndCacheTime $cache_state
 
+# Write response to caller:
+cat >$response_file <<-EOF
+  Unbust Policy Response file v1
+  $project_name
+  $cache_policy
+  $support_time $cache_time $state_duration
+EOF
 # ############# Set CDN configuration ############################
 # Stale while revalidate for 1 month for assets, 2 days for entry points with cache time >= 7 days
 versioned_assets_cache_param="public, max-age=63072000, immutable, stale-while-revalidate=2592000, stale-if-error=31536000"
@@ -406,7 +420,7 @@ fi
 # ie, email/slack/calendar/etc.
 #
 entry_points=(index.html offline.html)
-for f in ${entry_points[@]} ; do 
+for f in ${entry_points[@]} ; do
 sed --in-place '
     s@_CACHE_POLICY_@'"$cache_policy"'@g;
     s@_ENTRY_CACHE_TIME_@'"$cache_time"'@g;

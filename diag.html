@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Roadmap.js Example</title>
+  <script src="http://cdnjs.cloudflare.com/ajax/libs/d3/3.5.2/d3.min.js"></script>
+  <script type="text/javascript">
+    const SOURCE_COMMIT_SHA="_SOURCE_COMMIT_SHA_";
+  </script>
+  <script type="text/javascript" src="roadmap.js"></script>
+  <style>
+
+    * {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+body {
+      /* background: #fff; */
+      font-family: sans-serif;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  flex-direction: column;
+}
+
+h1 {
+    font-size:larger;
+}
+h2 {
+    font-size:medium;
+    margin: .15em 0;
+}
+#resize-me {
+  border: 2px solid #333;
+  /* background-color: #1af; */
+  flex-basis: 40vh;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+}
+
+#and-me {
+      display: flex;
+      border: 0px solid #333;
+      min-width: 80px;
+      min-height: 40px;
+      flex-basis: 60vh;
+      width: 100%;
+}
+    
+#one, #two {
+      flex-basis: 50%;
+      border: 1px solid #333;
+      /* height: 100%; */
+      overflow: hidden;  
+      flex-grow: 1;
+      align-content: center;
+      text-align: center;
+}
+    
+#one iframe, #two iframe {
+      width: 100%;
+      height: 100%;
+      border: 1px solid #30303050;
+}
+
+#one, #two {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='10' y='20' width='10' height='10' font-size='24' font-family='sans-serif' fill-opacity='0.3' fill='%23000'%3ESelect a deployed page to compare%3C/text%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-size: 26em 2em;
+      background-position: center;
+      display: flex;
+      flex-direction: column;
+}
+
+.roadmap {
+    width: 90%;
+    margin: auto;
+}
+.code {
+    font-family: monospace;
+    background-color: #f7f7f7;
+    font-weight: bold;
+    padding: 2px 4px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+  </style>
+</head>
+<body>
+    <div id="resize-me">
+        <h1>Roadmap for _BRANCH_ (currently on _PROJECT_)</h3>
+        <div class="roadmap" data-graph-date-format="%-m/%-Y" data-webframes="as-published as-is">
+            Project, 100, https://07d7f6de.cloudflare-tests.pages.dev, 38963ed70ead
+            2025-01-11 > 2025-01-12
+            subdir/404.html
+            subdir/index.html
+            edge-cached-1-minute/404.html
+            index.html
+            offline.html
+            subdir/404.html
+            subdir/index.html
+            edge-cached-1-minute/404.html
+            index.html
+            offline.html
+
+        </div><!-- END-OF-DATA -->
+    </div>
+    <div id="and-me">
+        <div id="one"><h2><a id="as-published-url" target="as-published">When published</a> (<span class="code" id="as-published-commit"></span>), <span id="as-published-what">it</span> <span id="as-published-look">looked</span> like this:</h2><iframe id="as-published"></iframe></div>
+        <div id="two"><h2><a id="as-is-url" target="as-is">Now</a> (<span class="code" id="as-is-commit"></span>), <span id="as-is-what">it</span> <span id="as-is-look">looks</span> like this:</h2><iframe id="as-is"></iframe></div>
+    </div>
+  
+    <script>
+    document.getElementById('resize-me').addEventListener('click', function(event) {
+      if (!event.defaultPrevented) {
+        document.getElementById('as-published').src = '';
+        document.getElementById('as-is').src = '';
+        document.getElementById('as-published-url').removeAttribute('href');
+        document.getElementById('as-is-url').removeAttribute('href');
+        document.getElementById('as-published-commit').innerText = '';
+        document.getElementById('as-is-commit').innerText = '';
+      }
+    });
+    </script>
+</body>
+</html>
