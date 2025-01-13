@@ -513,7 +513,7 @@ EOF
 			# has ONE JOB, and that is it.
 			#
 
-			if ! wget --cut-dirs=$urldepth--retry-connrefused --recursive --no-host-directories --input-file=$list --base="$dburl" -o "$wgetlog" ; then
+			if ! wget --cut-dirs=$urldepth--retry-connrefused --force-directories --no-host-directories --input-file=$list --base="$dburl" -o "$wgetlog" ; then
 				echo "# ##########################################################"
 				echo "# #######  Failed to download deprecated files: ############"
 				echo "# ##########################################################"
