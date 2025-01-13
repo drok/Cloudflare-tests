@@ -388,7 +388,7 @@ EOF
 		local project_name cache_state_name
 		local a b c d unused
 		while read -r trailer a b c d unused ; do
-			echo "looking at ${trailer,,}"
+			unset project_name cache_state_name
 			case ${trailer,,} in
 				project:) project_name=($a $b $c $d $unused)
 						project_name="${project_name[*]}"
