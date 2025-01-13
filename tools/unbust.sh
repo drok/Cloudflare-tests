@@ -483,7 +483,9 @@ EOF
 					fi
 				fi
 			done < <(git show "$commit":files) >$list
-			echo "" >> $diagout
+			if [[ ${diagout:+isset} ]] ; then
+				echo "" >> $diagout
+			fi
 		fi
 
 		replacement_time=$deployment_time
